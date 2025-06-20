@@ -4,3 +4,4 @@ logs
 __pycache__
 poetry.toml
 s3_config.json
+root.crt
