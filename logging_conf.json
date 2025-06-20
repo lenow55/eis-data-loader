@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "formatters": {
+    "default": {
+      "format": "%(asctime)s - %(name)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
+    },
+    "loader_fmt": {
+      "format": "%(asctime)s - %(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
+    },
+    "worker_fmt": {
+      "format": "%(asctime)s - %(worker_id)s:%(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
+    }
+  },
+  "handlers": {
+    "default": {
+      "class": "logging.StreamHandler",
+      "formatter": "default",
+      "level": "DEBUG",
+      "stream": "ext://sys.stdout"
+    },
+    "file": {
+      "class": "src.utils.log_handlers.RotatingFileHandler",
+      "formatter": "default",
+      "maxBytes": 512000,
+      "backupCount": 3,
+      "filename": "./logs/file.log"
+    },
+    "loader_file": {
+      "class": "src.utils.log_handlers.RotatingFileHandler",
+      "formatter": "loader_fmt",
+      "maxBytes": 10240000,
+      "backupCount": 10,
+      "filename": "./logs/loader.log"
+    },
+    "worker_file": {
+      "class": "src.utils.log_handlers.RotatingFileHandler",
+      "formatter": "worker_fmt",
+      "maxBytes": 10240000,
+      "backupCount": 10,
+      "filename": "./logs/worker.log"
+    }
+  },
+  "loggers": {
+    "__main__": {
+      "level": "DEBUG",
+      "handlers": ["file"]
+    },
+    "src.processor": {
+      "level": "INFO",
+      "handlers": ["worker_file"]
+    },
+    "LoadClusterTask": {
+      "level": "DEBUG",
+      "handlers": ["loader_file"]
+    }
+  }
+}

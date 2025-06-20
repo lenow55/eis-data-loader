@@ -1,0 +1,13 @@
+{
+  "configurations": [
+    {
+      "name": "run main",
+      "type": "python",
+      "request": "launch",
+      "module": "src",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {}
+    }
+  ]
+}

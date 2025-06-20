@@ -1,0 +1,6 @@
+.vectorcode
+data_v2_temp
+logs
+__pycache__
+poetry.toml
+s3_config.json
