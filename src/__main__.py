@@ -2,7 +2,6 @@ import json
 import logging
 import multiprocessing
 import os
-import signal
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from logging import config as log_config_m
@@ -44,10 +43,12 @@ client: S3Client = session.client(
 )
 
 if __name__ == "__main__":
-    count_workers = 4
+    count_workers = 1
     q_size = 8
     start_time = datetime.fromisoformat("2024-12-15T09:00:00")
     end_time = datetime.fromisoformat("2024-12-30T19:00:00")
+    timedeltas = [timedelta(hours=1), timedelta(minutes=20)]
+    aggregations = [["pod_node_name"], ["app"]]
 
     queues: list["Queue[LoadComplete]"] = [
         Queue(maxsize=q_size) for _ in range(count_workers)
@@ -86,8 +87,8 @@ if __name__ == "__main__":
             bucket_name="metrics",
             cluster_name=cluster,
             q_manager=q_manager,
-            start_time=datetime.fromisoformat("2024-12-15T09:00:00"),
-            end_time=datetime.fromisoformat("2024-12-30T19:00:00"),
+            start_time=start_time,
+            end_time=end_time,
             times2load=times2load,
             task_id=task_id,
             metrics_list=[
@@ -107,8 +108,8 @@ if __name__ == "__main__":
             queue_in=queue,
             stop_event=stopEvent,
             report_queue=report_queue,
-            timedeltas=[timedelta(hours=1), timedelta(minutes=20)],
-            aggregations=[["pod_node_name"], ["app"]],
+            timedeltas=timedeltas,
+            aggregations=aggregations,
         )
         worker.start()
 
