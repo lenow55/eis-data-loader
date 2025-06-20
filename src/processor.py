@@ -354,11 +354,10 @@ class Worker(multiprocessing.Process):
             if metric_data.empty:
                 # если данные пустые, то пропускаем обработку
                 # пока не окажемся на конце кластера
-                if is_end:
-                    # в конце кластера вставляем предыдущий датасет просто, если есть
-                    prev_dataset = self._previous_datasets.get(metric_name)
-                    if isinstance(prev_dataset, pd.DataFrame):
-                        result.update({metric_name: prev_dataset})
+                # в конце кластера вставляем предыдущий датасет просто, если есть
+                prev_dataset = self._previous_datasets.get(metric_name)
+                if isinstance(prev_dataset, pd.DataFrame):
+                    result.update({metric_name: prev_dataset})
 
                 self.logger.info(f"Metric data empty {metric_name}")
                 continue
