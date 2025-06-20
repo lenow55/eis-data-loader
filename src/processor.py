@@ -155,51 +155,37 @@ class Worker(multiprocessing.Process):
 
     def _process_error_total(
         self,
-        current_dataframe: pd.DataFrame,
+        metric_name: str,
         merged_dataset: pd.DataFrame,
-        task: LoadComplete,
+        values_by_timeperiods: pd.DataFrame,
+        period: timedelta,
     ):
-        if not isinstance(self._previous_time, datetime):
-            if not task.is_end:
-                return
-            self._previous_time = task.loaded_datetime
-        for period in self._timedeltas:
-            values_by_timeperiods = values_by_timeperiods_func(
-                merged_dataset, self._previous_time, period
+        dropnan = lambda a: a[~np.isnan(a)]
+        change_by_timeperiod = values_by_timeperiods.map(dropnan)
+        change_by_timeperiod = change_by_timeperiod.map(np.diff)
+        change_by_timeperiod = change_by_timeperiod.map(np.clip, a_min=0, a_max=None)
+        change_by_timeperiod = change_by_timeperiod.map(np.sum)
+
+        for aggregation in self._aggregations:
+            keys = [merged_dataset[col] for col in aggregation]
+
+            groups = change_by_timeperiod.groupby(keys)
+            sum_df = groups.sum().T
+            sum_df = sum_df.add_suffix("_sum")
+            max_df = groups.max().T
+            max_df = max_df.add_suffix("_max")
+            mean_df = groups.mean().T
+            mean_df = mean_df.add_suffix("_mean")
+            std_df = groups.std().T
+            std_df = std_df.add_suffix("_std")
+
+            aggregate_df = sum_df.join([max_df, mean_df, std_df])
+            self._update_df(
+                "application_stats_error_total",
+                period,
+                "-".join(aggregation),
+                aggregate_df,
             )
-
-            # INFO: дальше идёт суммирование и агрегации
-            # в ошибках делаем только разность из большего меньшее
-            dropnan = lambda a: a[~np.isnan(a)]
-            change_by_timeperiod = values_by_timeperiods.map(dropnan)
-            change_by_timeperiod = change_by_timeperiod.map(np.diff)
-            change_by_timeperiod = change_by_timeperiod.map(
-                np.clip, a_min=0, a_max=None
-            )
-            change_by_timeperiod = change_by_timeperiod.map(np.sum)
-
-            for aggregation in self._aggregations:
-                keys = [merged_dataset[col] for col in aggregation]
-
-                groups = change_by_timeperiod.groupby(keys)
-                sum_df = groups.sum().T
-                sum_df = sum_df.add_suffix("_sum")
-                max_df = groups.max().T
-                max_df = max_df.add_suffix("_max")
-                mean_df = groups.mean().T
-                mean_df = mean_df.add_suffix("_mean")
-                std_df = groups.std().T
-                std_df = std_df.add_suffix("_std")
-
-                aggregate_df = sum_df.join([max_df, mean_df, std_df])
-                self._update_df(
-                    "application_stats_error_total",
-                    period,
-                    "-".join(aggregation),
-                    aggregate_df,
-                )
-
-        self._previous_datasets["application_stats_error_total"] = current_dataframe
 
     def _preprocess_data(self, task: LoadComplete):
         filename_err = task.metrics["application_stats_error_total"]
@@ -278,6 +264,38 @@ class Worker(multiprocessing.Process):
 
         return result
 
+    def _perform_values_by_timedelta(self, merged_data: dict[str, pd.DataFrame]):
+        futures: dict[tuple[str, timedelta], Future[pd.DataFrame]] = {}
+
+        result: dict[tuple[str, timedelta], pd.DataFrame] = {}
+
+        for metric_name, metric_data in merged_data.items():
+            if not isinstance(self._previous_time, datetime):
+                continue
+            for period in self._timedeltas:
+                self.logger.info(
+                    f"Try compute values_by_timeperiods: {metric_name}; timedelta: {period}"
+                )
+
+                # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
+                future = self.nested_executor.submit(
+                    values_by_timeperiods_func,
+                    merged_dataset=metric_data,
+                    start_time=self._previous_time,
+                    period=period,
+                )
+                futures.update({(metric_name, period): future})
+
+        for metric_td, future in futures.items():
+            metric, period = metric_td
+            res_df = future.result()
+            result.update({(metric, period): res_df})
+            self.logger.info(
+                f"Computed values_by_timeperiods {metric}; timedelta: {period}"
+            )
+
+        return result
+
     @override
     def run(self):
         self.nested_executor = ProcessPoolExecutor(max_workers=3)
@@ -300,21 +318,24 @@ class Worker(multiprocessing.Process):
 
                 result_merge = self._perform_merge(result_preprocessing, task.is_end)
 
+                result_val_by_period = self._perform_values_by_timedelta(
+                    merged_data=result_merge
+                )
+
                 if self._previous_time:
                     self.logger.debug(
                         f"start processing time: {self._previous_time.isoformat()}"
                     )
                     # INFO: обрабатываем метрики и набираем датасеты
-                    self._process_error_total(
-                        result_preprocessing["application_stats_error_total"],
-                        result_merge["application_stats_error_total"],
-                        task,
-                    )
-                    self._process_seconds_count(
-                        result_preprocessing["application_stats_seconds_count"],
-                        result_merge["application_stats_seconds_count"],
-                        task,
-                    )
+                    # self._process_error_total(
+                    #     result_preprocessing["application_stats_error_total"],
+                    #     result_merge["application_stats_error_total"],
+                    # )
+                    # self._process_seconds_count(
+                    #     result_preprocessing["application_stats_seconds_count"],
+                    #     result_merge["application_stats_seconds_count"],
+                    #     task,
+                    # )
                 else:
                     self.logger.info("Sckiped first record")
 
@@ -335,16 +356,16 @@ class Worker(multiprocessing.Process):
                     # почистили прошлый датасет
                     self._previous_datasets = {}
 
-                    self._process_error_total(
-                        result_preprocessing["application_stats_error_total"],
-                        result_merge["application_stats_error_total"],
-                        task,
-                    )
-                    self._process_seconds_count(
-                        result_preprocessing["application_stats_seconds_count"],
-                        result_merge["application_stats_seconds_count"],
-                        task,
-                    )
+                    # self._process_error_total(
+                    #     result_preprocessing["application_stats_error_total"],
+                    #     result_merge["application_stats_error_total"],
+                    #     task,
+                    # )
+                    # self._process_seconds_count(
+                    #     result_preprocessing["application_stats_seconds_count"],
+                    #     result_merge["application_stats_seconds_count"],
+                    #     task,
+                    # )
 
                     self._previous_datasets = {}
                     self._cluster_in_progress = None
