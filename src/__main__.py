@@ -11,12 +11,13 @@ import pandas as pd
 from boto3.session import Session
 from botocore.config import Config
 from mypy_boto3_s3.client import S3Client
-from rich.progress import Progress, TaskID, TimeElapsedColumn
+from rich.progress import MofNCompleteColumn, Progress, TaskID, TimeElapsedColumn
 
 from src.config import ExternalMinioSettings
 from src.minio_loader import LoadClusterTask
 from src.processor import Worker
 from src.schemas import LoadComplete
+from src.utils.clusters import CLUSTERS
 from src.utils.qmanager import QueueManager
 
 settings_minio = ExternalMinioSettings()  # pyright: ignore[reportCallIssue]
@@ -43,10 +44,12 @@ client: S3Client = session.client(
 )
 
 if __name__ == "__main__":
-    count_workers = 1
+    # count_workers = 5
+    count_workers = 3
     q_size = 8
-    start_time = datetime.fromisoformat("2024-12-15T09:00:00")
-    end_time = datetime.fromisoformat("2024-12-30T19:00:00")
+    # start_time = datetime.fromisoformat("2024-09-01T00:00:00")
+    start_time = datetime.fromisoformat("2024-12-28T00:00:00")
+    end_time = datetime.fromisoformat("2024-12-31T23:00:00")
     timedeltas = [timedelta(hours=1), timedelta(minutes=20)]
     aggregations = [["pod_node_name"], ["app"]]
 
@@ -57,17 +60,11 @@ if __name__ == "__main__":
 
     report_queue: "Queue[tuple[TaskID, bool]]" = Queue()
 
-    clusters = [
-        "priv-dstore-fcs",
-        "priv-filestore-rdik",
-        "priv-fstore-rkshard",
-        "priv-nsieis",
-        "priv-priz",
-    ]
     tasks: list[LoadClusterTask] = []
     progress = Progress(
         *Progress.get_default_columns(),
         TimeElapsedColumn(),
+        MofNCompleteColumn(),
     )
     progress.start()
 
@@ -78,7 +75,7 @@ if __name__ == "__main__":
         inclusive="both",
     )
 
-    for i, cluster in enumerate(clusters):
+    for i, cluster in enumerate(CLUSTERS):
         task_id = progress.add_task(
             cluster, total=len(times2load), visible=False, start=False
         )

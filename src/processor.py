@@ -169,6 +169,7 @@ class Worker(multiprocessing.Process):
                 "-".join(aggregation),
                 aggregate_df,
             )
+            self.logger.debug(f"\n{aggregate_df.head(10)}")
 
     def _preprocess_data(self, task: LoadComplete):
         filename_err = task.metrics["application_stats_error_total"]
@@ -239,6 +240,7 @@ class Worker(multiprocessing.Process):
                 key_cols=COLS_KEYS_MAPPING[metric_name],
             )
             futures.update({metric_name: future})
+            self._previous_datasets[metric_name] = metric_data
 
         for metric, future in futures.items():
             preproces_res_df = future.result()
@@ -351,7 +353,6 @@ class Worker(multiprocessing.Process):
                             )
 
                     self._previous_datasets = {}
-                    self._cluster_in_progress = None
                     self._previous_time = None
                     self._report_queue.put((task.task_id, True))
 
@@ -361,6 +362,10 @@ class Worker(multiprocessing.Process):
                                 self.logger.info(
                                     f"END: {metric} -> {period} -> {aggregate}: shape: {item3.shape}"
                                 )
+                                file_path = f"datasets/{self._cluster_in_progress}_{metric}_{period.total_seconds()}_{aggregate}.csv"
+                                item3.to_csv(file_path)
+                                self.logger.info(f"Saved: {file_path}")
+                    self._cluster_in_progress = None
 
                 if isinstance(self.logger.extra, dict):
                     self.logger.extra.update(
