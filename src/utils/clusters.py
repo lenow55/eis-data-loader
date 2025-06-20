@@ -1,6 +1,6 @@
 CLUSTERS = [
     # "priv-dstore-fcs",
     "priv-filestore-rdik",
-    "priv-fstore-rkshard",
-    "priv-nsieis",
+    # "priv-fstore-rkshard",
+    # "priv-nsieis",
 ]

@@ -1,7 +1,7 @@
 import logging
 import multiprocessing
-from operator import is_
 import traceback
+from collections import defaultdict
 from concurrent.futures import Future, ProcessPoolExecutor
 from datetime import datetime, timedelta
 from multiprocessing import Queue
@@ -103,6 +103,87 @@ class Worker(multiprocessing.Process):
         self.logger.debug(
             f"Dimesion:\n{self._resulted_datasets[metric][period][aggregation].shape}"
         )
+
+    def _process_seconds_count(
+        self,
+        merged_dataset: pd.DataFrame,
+        values_by_timeperiods: pd.DataFrame,
+        period: timedelta,
+    ):
+        dropnan = lambda a: a[~np.isnan(a)]
+        change_by_timeperiod = values_by_timeperiods.map(dropnan)
+        change_by_timeperiod = change_by_timeperiod.map(np.diff)
+        change_by_timeperiod = change_by_timeperiod.map(np.clip, a_min=0, a_max=None)
+        change_by_timeperiod = change_by_timeperiod.map(np.sum)
+
+        for aggregation in self._aggregations:
+            keys = [merged_dataset[col] for col in aggregation]
+
+            groups = change_by_timeperiod.groupby(keys)
+            sum_df = groups.sum().T
+            sum_df = sum_df.add_suffix("_sum")
+            max_df = groups.max().T
+            max_df = max_df.add_suffix("_max")
+            mean_df = groups.mean().T
+            mean_df = mean_df.add_suffix("_mean")
+            std_df = groups.std().T
+            std_df = std_df.add_suffix("_std")
+
+            aggregate_df = sum_df.join([max_df, mean_df, std_df])
+            self._update_df(
+                "application_stats_seconds_count",
+                period,
+                "-".join(aggregation),
+                aggregate_df,
+            )
+
+    def _process_devide_error_by_requests(
+        self,
+        merged_dataset_err: pd.DataFrame,
+        values_by_timeperiods_err: pd.DataFrame,
+        merged_dataset_req: pd.DataFrame,
+        values_by_timeperiods_req: pd.DataFrame,
+        period: timedelta,
+    ):
+        dropnan = lambda a: a[~np.isnan(a)]
+        # подготавливаем ошибки
+        change_by_timeperiod_err = values_by_timeperiods_err.map(dropnan)
+        change_by_timeperiod_err = change_by_timeperiod_err.map(np.diff)
+        change_by_timeperiod_err = change_by_timeperiod_err.map(
+            np.clip, a_min=0, a_max=None
+        )
+        change_by_timeperiod_err = change_by_timeperiod_err.map(np.sum)
+
+        # подготавливаем запросы
+        change_by_timeperiod_req = values_by_timeperiods_req.map(dropnan)
+        change_by_timeperiod_req = change_by_timeperiod_req.map(np.diff)
+        change_by_timeperiod_req = change_by_timeperiod_req.map(
+            np.clip, a_min=0, a_max=None
+        )
+        change_by_timeperiod_req = change_by_timeperiod_req.map(np.sum)
+
+        change_by_timeperiod = change_by_timeperiod_err.div(change_by_timeperiod_req)
+
+        for aggregation in self._aggregations:
+            keys = [merged_dataset_err[col] for col in aggregation]
+
+            groups = change_by_timeperiod.groupby(keys)
+            sum_df = groups.sum(numeric_only=True).T
+            sum_df = sum_df.add_suffix("_sum")
+            max_df = groups.max(numeric_only=True).T
+            max_df = max_df.add_suffix("_max")
+            mean_df = groups.mean(numeric_only=True).T
+            mean_df = mean_df.add_suffix("_mean")
+            std_df = groups.std(numeric_only=True).T
+            std_df = std_df.add_suffix("_std")
+
+            aggregate_df = sum_df.join([max_df, mean_df, std_df])
+            self._update_df(
+                "errors_by_requests",
+                period,
+                "-".join(aggregation),
+                aggregate_df,
+            )
 
     def _process_seconds_count(
         self,
@@ -314,12 +395,37 @@ class Worker(multiprocessing.Process):
                 else:
                     self.logger.info("Sckiped first record")
 
+                grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = defaultdict(
+                    dict
+                )
                 for key, item in result_val_by_period.items():
                     metric, period = key
                     if metric == "application_stats_error_total":
                         self._process_error_total(result_merge[metric], item, period)
                     if metric == "application_stats_seconds_count":
                         self._process_seconds_count(result_merge[metric], item, period)
+                    grouped[period][metric] = item
+
+                for period, metric_group in grouped.items():
+                    if (
+                        "application_stats_error_total" in metric_group
+                        and "application_stats_seconds_count" in metric_group
+                    ):
+                        self._process_devide_error_by_requests(
+                            merged_dataset_err=result_merge[
+                                "application_stats_error_total"
+                            ],
+                            merged_dataset_req=result_merge[
+                                "application_stats_seconds_count"
+                            ],
+                            values_by_timeperiods_err=metric_group[
+                                "application_stats_error_total"
+                            ],
+                            values_by_timeperiods_req=metric_group[
+                                "application_stats_seconds_count"
+                            ],
+                            period=period,
+                        )
 
                 if self._previous_time:
                     self._report_queue.put((task.task_id, False))

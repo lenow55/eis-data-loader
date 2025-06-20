@@ -184,12 +184,14 @@ class LoadClusterTask:
                 end = datetime.now().timestamp()
                 wait_time = end - start
                 self.logger.debug(f"Wait queue: {wait_time:.2f} seconds")
+
+            self.logger.info("Task finished")
+        except Exception:
+            self.logger.info("Interrupt task")
         finally:
             # освобождаем очередь
             self.logger.info("Queue released")
             self._q_manager.release_queue(lock)
-
-        self.logger.info("Task finished")
 
     def _get_files_with_sizes(self, prefix: str):
         if not prefix.endswith("/"):
