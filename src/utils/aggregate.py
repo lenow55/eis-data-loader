@@ -43,24 +43,62 @@ def values_by_timeperiods_func(
     start_time: datetime,
     period: timedelta,
 ):
-    end_time: datetime = start_time + timedelta(hours=1)
-    time_intervals: np.ndarray = pd.date_range(
-        start_time, end_time, freq=period, tz=UTC
-    ).to_pydatetime()
-    # Формируем интервалы (start, end) как пары соседних времён
-    time_intervals_list: list[tuple[datetime, datetime]] = [
-        (time_intervals[i], time_intervals[i + 1])
-        for i in range(len(time_intervals) - 1)
-    ]
-    clamp_in_timedelta_p = partial(
-        clamp_in_timedelta,
-        time_intervals=time_intervals_list,
-        none_to_zero=False,
+    end_time = start_time + timedelta(hours=1)
+    intervals = pd.date_range(start_time, end_time, freq=period, tz=UTC)
+    bins = pd.IntervalIndex.from_breaks(intervals, closed="left")
+    # Добавим уникальный идентификатор строки, если их несколько
+    merged_dataset = merged_dataset.reset_index()
+    df = merged_dataset.explode(["timestamps", "values"])
+    df["timestamps"] = pd.to_datetime(df["timestamps"], utc=True)
+    df["interval"] = pd.cut(df["timestamps"], bins)
+    # Группировка: по исходной группе (index) и интервалу
+    grouped = (
+        df.groupby(["index", "interval"])["values"]
+        .apply(lambda x: np.array(list(x), dtype=float))
+        .reset_index()
     )
-    values_by_timeperiods = merged_dataset.loc[:, ["timestamps", "values"]].apply(
-        clamp_in_timedelta_p, axis=1
-    )
-    return values_by_timeperiods
+
+    # Добавляем первое значение после конца интервала для каждой группы
+    def append_after(row):
+        idx, interval = row["index"], row["interval"]
+        mask = (df["index"] == idx) & (df["timestamps"] >= interval.right)
+        after = df.loc[mask, "values"]
+        arr = row["values"]
+        if not after.empty:  # pyright: ignore[reportAttributeAccessIssue]
+            arr = np.append(arr, after.iloc[0])  # pyright: ignore[reportAttributeAccessIssue]
+        return arr
+
+    grouped["values"] = grouped.apply(append_after, axis=1)
+    # Привести к формату: index -> интервалы -> значения
+    result = grouped.pivot(index="index", columns="interval", values="values")
+    result.columns = [i.right for i in result.columns]  # pyright: ignore[reportAttributeAccessIssue]
+    result = result.sort_index(axis=1)
+    return result.reset_index(drop=True)
+
+
+# def values_by_timeperiods_func(
+#     merged_dataset: pd.DataFrame,
+#     start_time: datetime,
+#     period: timedelta,
+# ):
+#     end_time: datetime = start_time + timedelta(hours=1)
+#     time_intervals: np.ndarray = pd.date_range(
+#         start_time, end_time, freq=period, tz=UTC
+#     ).to_pydatetime()
+#     # Формируем интервалы (start, end) как пары соседних времён
+#     time_intervals_list: list[tuple[datetime, datetime]] = [
+#         (time_intervals[i], time_intervals[i + 1])
+#         for i in range(len(time_intervals) - 1)
+#     ]
+#     clamp_in_timedelta_p = partial(
+#         clamp_in_timedelta,
+#         time_intervals=time_intervals_list,
+#         none_to_zero=False,
+#     )
+#     values_by_timeperiods = merged_dataset.loc[:, ["timestamps", "values"]].apply(
+#         clamp_in_timedelta_p, axis=1
+#     )
+#     return values_by_timeperiods
 
 
 def merge_current_with_prev(
