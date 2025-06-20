@@ -5,3 +5,4 @@ __pycache__
 poetry.toml
 s3_config.json
 root.crt
+datasets
