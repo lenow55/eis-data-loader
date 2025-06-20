@@ -19,6 +19,7 @@ from src.utils.aggregate import (
     merge_current_with_prev,
     values_by_timeperiods_func,
 )
+from src.utils.log_handlers import RotatingFileHandler
 from src.utils.reading import preprocess_metric_df
 
 
@@ -37,7 +38,16 @@ class Worker(multiprocessing.Process):
         self._report_queue: Queue[tuple[TaskID, bool]] = report_queue
         self.worker_id: int = worker_id
 
-        self._base_logger: logging.Logger = logging.getLogger(__name__)
+        self._base_logger: logging.Logger = logging.getLogger(
+            f"{__name__}.{self.worker_id}"
+        )
+        handler = RotatingFileHandler(f"./logs/worker_id_{self.worker_id}.log")
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s - %(worker_id)s:%(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
+            )
+        )
+        self._base_logger.addHandler(handler)
         self._cluster_in_progress: str | None = None
         self.logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(
             self._base_logger,

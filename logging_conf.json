@@ -6,9 +6,6 @@
     },
     "loader_fmt": {
       "format": "%(asctime)s - %(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
-    },
-    "worker_fmt": {
-      "format": "%(asctime)s - %(worker_id)s:%(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
     }
   },
   "handlers": {
@@ -31,13 +28,6 @@
       "maxBytes": 10240000,
       "backupCount": 10,
       "filename": "./logs/loader.log"
-    },
-    "worker_file": {
-      "class": "src.utils.log_handlers.RotatingFileHandler",
-      "formatter": "worker_fmt",
-      "maxBytes": 10240000,
-      "backupCount": 10,
-      "filename": "./logs/worker.log"
     }
   },
   "loggers": {
@@ -45,9 +35,17 @@
       "level": "DEBUG",
       "handlers": ["file"]
     },
-    "src.processor": {
-      "level": "INFO",
-      "handlers": ["worker_file"]
+    "src.processor.0": {
+      "level": "INFO"
+    },
+    "src.processor.1": {
+      "level": "INFO"
+    },
+    "src.processor.2": {
+      "level": "INFO"
+    },
+    "src.processor.3": {
+      "level": "INFO"
     },
     "LoadClusterTask": {
       "level": "DEBUG",
