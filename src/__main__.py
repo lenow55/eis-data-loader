@@ -96,6 +96,9 @@ if __name__ == "__main__":
         )
         tasks.append(task)
 
+    total_task = progress.add_task(
+        "Total", total=len(CLUSTERS), visible=True, start=True
+    )
     stopEvent = multiprocessing.Event()
 
     workers: list[Worker] = []
@@ -129,6 +132,7 @@ if __name__ == "__main__":
             if msg[1]:
                 progress.stop_task(msg[0])
                 progress.advance(msg[0], len(times2load))
+                progress.advance(total_task, 1)
             if progress.finished:
                 stopEvent.set()
                 break
