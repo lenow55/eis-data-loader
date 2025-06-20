@@ -201,6 +201,42 @@ class Worker(multiprocessing.Process):
 
         self._previous_datasets["application_stats_error_total"] = current_dataframe
 
+    def _preprocess_data(self, task: LoadComplete):
+        filename_err = task.metrics["application_stats_error_total"]
+        filename_count = task.metrics["application_stats_seconds_count"]
+        filename_seconds = task.metrics["application_stats_seconds"]
+
+        preprocess_futures: dict[str, Future[pd.DataFrame]] = {}
+        preprocess_futures.update(
+            {
+                "application_stats_error_total": self.nested_executor.submit(
+                    preprocess_metric_df, file_path=filename_err
+                )
+            }
+        )
+        preprocess_futures.update(
+            {
+                "application_stats_seconds_count": self.nested_executor.submit(
+                    preprocess_metric_df, file_path=filename_count
+                )
+            }
+        )
+        preprocess_futures.update(
+            {
+                "application_stats_seconds": self.nested_executor.submit(
+                    preprocess_metric_df, file_path=filename_seconds
+                )
+            }
+        )
+        result_preprocessing: dict[str, pd.DataFrame] = {}
+
+        for metric, future in preprocess_futures.items():
+            preproces_res_df = future.result()
+            result_preprocessing.update({metric: preproces_res_df})
+            self.logger.info(f"Preprocessed {metric}")
+
+        return result_preprocessing
+
     def _perform_merge(self, preprocessed_data: dict[str, pd.DataFrame], is_end: bool):
         futures: dict[str, Future[pd.DataFrame]] = {}
 
@@ -241,42 +277,6 @@ class Worker(multiprocessing.Process):
             self.logger.info(f"Merged {metric}")
 
         return result
-
-    def _preprocess_data(self, task: LoadComplete):
-        filename_err = task.metrics["application_stats_error_total"]
-        filename_count = task.metrics["application_stats_seconds_count"]
-        filename_seconds = task.metrics["application_stats_seconds"]
-
-        preprocess_futures: dict[str, Future[pd.DataFrame]] = {}
-        preprocess_futures.update(
-            {
-                "application_stats_error_total": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_err
-                )
-            }
-        )
-        preprocess_futures.update(
-            {
-                "application_stats_seconds_count": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_count
-                )
-            }
-        )
-        preprocess_futures.update(
-            {
-                "application_stats_seconds": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_seconds
-                )
-            }
-        )
-        result_preprocessing: dict[str, pd.DataFrame] = {}
-
-        for metric, future in preprocess_futures.items():
-            preproces_res_df = future.result()
-            result_preprocessing.update({metric: preproces_res_df})
-            self.logger.info(f"Preprocessed {metric}")
-
-        return result_preprocessing
 
     @override
     def run(self):
