@@ -17,6 +17,7 @@ from src.schemas import LoadComplete
 from src.utils.aggregate import (
     COLS_KEYS_MAPPING,
     merge_current_with_prev,
+    safe_quantile,
     values_by_timeperiods_func,
 )
 from src.utils.log_handlers import RotatingFileHandler
@@ -145,6 +146,7 @@ class Worker(multiprocessing.Process):
         values_by_timeperiods_req: pd.DataFrame,
         period: timedelta,
     ):
+        self.logger.info("process errors by requests")
         dropnan = lambda a: a[~np.isnan(a)]
         # подготавливаем ошибки
         change_by_timeperiod_err = values_by_timeperiods_err.map(dropnan)
@@ -191,6 +193,7 @@ class Worker(multiprocessing.Process):
         values_by_timeperiods: pd.DataFrame,
         period: timedelta,
     ):
+        self.logger.info("process application_stats_seconds_count")
         dropnan = lambda a: a[~np.isnan(a)]
         change_by_timeperiod = values_by_timeperiods.map(dropnan)
         change_by_timeperiod = change_by_timeperiod.map(np.diff)
@@ -224,6 +227,7 @@ class Worker(multiprocessing.Process):
         values_by_timeperiods: pd.DataFrame,
         period: timedelta,
     ):
+        self.logger.info("process application_stats_error_total")
         dropnan = lambda a: a[~np.isnan(a)]
         change_by_timeperiod = values_by_timeperiods.map(dropnan)
         change_by_timeperiod = change_by_timeperiod.map(np.diff)
@@ -251,6 +255,59 @@ class Worker(multiprocessing.Process):
                 aggregate_df,
             )
             self.logger.debug(f"\n{aggregate_df.head(10)}")
+
+    def _compute_quantile(
+        self,
+        merged_dataset: pd.DataFrame,
+        change_by_timeperiod: pd.DataFrame,
+        quantile: str,
+        period: timedelta,
+    ):
+        for aggregation in self._aggregations:
+            keys = [merged_dataset[col] for col in aggregation]
+            keys.append(merged_dataset["quantile"])
+
+            groups = change_by_timeperiod.groupby(keys)
+            max_df = groups.max().T
+            max_df = max_df.add_suffix("_max")
+            mean_df = groups.mean().T
+            mean_df = mean_df.add_suffix("_mean")
+            std_df = groups.std().T
+            std_df = std_df.add_suffix("_std")
+
+            aggregate_df = max_df.join([mean_df, std_df])
+            self._update_df(
+                f"application_stats_seconds_{quantile}",
+                period,
+                "-".join(aggregation),
+                aggregate_df,
+            )
+            self.logger.debug(
+                f"application_stats_seconds_{quantile}\n{aggregate_df.head(10)}"
+            )
+
+    def _process_execution_time(
+        self,
+        merged_dataset: pd.DataFrame,
+        values_by_timeperiods: pd.DataFrame,
+        period: timedelta,
+    ):
+        self.logger.info("process application_stats_seconds")
+
+        dropnan = lambda a: a[~np.isnan(a)]
+        change_by_timeperiod = values_by_timeperiods.map(dropnan)
+        change_by_timeperiod = change_by_timeperiod.map(np.diff)
+        change_by_timeperiod = change_by_timeperiod.map(np.clip, a_min=0, a_max=None)
+
+        change_by_timeperiod50 = change_by_timeperiod.map(safe_quantile, q=0.5)
+        change_by_timeperiod75 = change_by_timeperiod.map(safe_quantile, q=0.75)
+        change_by_timeperiod90 = change_by_timeperiod.map(safe_quantile, q=0.9)
+        change_by_timeperiod95 = change_by_timeperiod.map(safe_quantile, q=0.95)
+
+        self._compute_quantile(merged_dataset, change_by_timeperiod50, "q50", period)
+        self._compute_quantile(merged_dataset, change_by_timeperiod75, "q75", period)
+        self._compute_quantile(merged_dataset, change_by_timeperiod90, "q90", period)
+        self._compute_quantile(merged_dataset, change_by_timeperiod95, "q95", period)
 
     def _preprocess_data(self, task: LoadComplete):
         filename_err = task.metrics["application_stats_error_total"]
@@ -404,6 +461,8 @@ class Worker(multiprocessing.Process):
                         self._process_error_total(result_merge[metric], item, period)
                     if metric == "application_stats_seconds_count":
                         self._process_seconds_count(result_merge[metric], item, period)
+                    if metric == "application_stats_seconds":
+                        self._process_execution_time(result_merge[metric], item, period)
                     grouped[period][metric] = item
 
                 for period, metric_group in grouped.items():
@@ -447,6 +506,9 @@ class Worker(multiprocessing.Process):
                     result_val_by_period = self._perform_values_by_timedelta(
                         merged_data=result_merge
                     )
+                    grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = (
+                        defaultdict(dict)
+                    )
                     for key, item in result_val_by_period.items():
                         metric, period = key
                         if metric == "application_stats_error_total":
@@ -456,6 +518,32 @@ class Worker(multiprocessing.Process):
                         if metric == "application_stats_seconds_count":
                             self._process_seconds_count(
                                 result_merge[metric], item, period
+                            )
+                        if metric == "application_stats_seconds":
+                            self._process_execution_time(
+                                result_merge[metric], item, period
+                            )
+                        grouped[period][metric] = item
+
+                    for period, metric_group in grouped.items():
+                        if (
+                            "application_stats_error_total" in metric_group
+                            and "application_stats_seconds_count" in metric_group
+                        ):
+                            self._process_devide_error_by_requests(
+                                merged_dataset_err=result_merge[
+                                    "application_stats_error_total"
+                                ],
+                                merged_dataset_req=result_merge[
+                                    "application_stats_seconds_count"
+                                ],
+                                values_by_timeperiods_err=metric_group[
+                                    "application_stats_error_total"
+                                ],
+                                values_by_timeperiods_req=metric_group[
+                                    "application_stats_seconds_count"
+                                ],
+                                period=period,
                             )
 
                     self._previous_datasets = {}

@@ -33,6 +33,13 @@ COLS_KEYS_MAPPING = {
 }
 
 
+def safe_quantile(arr: np.ndarray, q: float):
+    arr = np.asarray(arr)
+    if arr.size == 0:
+        return np.nan  # или любое дефолтное значение
+    return np.quantile(arr, q)
+
+
 def unix_ts2datetime(timestamps: list[int]):
     # нужно вычитать три часа, чтобы преобразовать во время utc
     return [datetime.fromtimestamp(timestamp / 1000.0, UTC) for timestamp in timestamps]
