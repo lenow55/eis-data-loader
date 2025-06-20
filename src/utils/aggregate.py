@@ -53,7 +53,7 @@ def values_by_timeperiods_func(
     df["interval"] = pd.cut(df["timestamps"], bins)
     # Группировка: по исходной группе (index) и интервалу
     grouped = (
-        df.groupby(["index", "interval"])["values"]
+        df.groupby(["index", "interval"], observed=True)["values"]
         .apply(lambda x: np.array(list(x), dtype=float))
         .reset_index()
     )
