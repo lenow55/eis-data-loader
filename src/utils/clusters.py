@@ -3,5 +3,6 @@ CLUSTERS = [
     # "priv-filestore-rdik",
     # "priv-fstore-rkshard",
     # "priv-nsieis",
-    "common-lko"
+    # "common-lko",
+    "epz-legal-acts"
 ]
