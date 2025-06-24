@@ -558,7 +558,10 @@ class Worker(multiprocessing.Process):
                                 file_path = f"datasets/{self._cluster_in_progress}_{metric}_{period.total_seconds()}_{aggregate}.csv"
                                 item3.to_csv(file_path)
                                 self.logger.info(f"Saved: {file_path}")
+
+                    # сбрасываем информацию о кластере
                     self._cluster_in_progress = None
+                    self._resulted_datasets = {}
 
                 if isinstance(self.logger.extra, dict):
                     self.logger.extra.update(
