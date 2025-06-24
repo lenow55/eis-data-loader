@@ -47,11 +47,12 @@ if __name__ == "__main__":
     # count_workers = 5
     count_workers = 1
     q_size = 8
-    # start_time = datetime.fromisoformat("2024-09-01T00:00:00")
-    start_time = datetime.fromisoformat("2024-12-28T00:00:00")
+    start_time = datetime.fromisoformat("2024-09-01T00:00:00")
+    # start_time = datetime.fromisoformat("2024-12-28T00:00:00")
+    # end_time = datetime.fromisoformat("2024-12-31T23:00:00")
     end_time = datetime.fromisoformat("2024-12-31T23:00:00")
     timedeltas = [timedelta(hours=1), timedelta(minutes=20)]
-    aggregations = [["pod_node_name"], ["app"]]
+    aggregations = [["pod_node_name"], ["cluster"]]
 
     queues: list["Queue[LoadComplete]"] = [
         Queue(maxsize=q_size) for _ in range(count_workers)

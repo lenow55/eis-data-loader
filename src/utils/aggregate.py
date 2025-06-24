@@ -10,25 +10,29 @@ COLS_KEYS_MAPPING = {
         "context",
         "group",
         "operation",
-        "app",
+        # "app",
         "pod_node_name",
+        "cluster",
+        "reason",
     ],
     "application_stats_seconds_count": [
         "pod_uid",
         "context",
         "group",
         "operation",
-        "app",
+        # "app",
         "pod_node_name",
+        "cluster",
     ],
     "application_stats_seconds": [
         "pod_uid",
         "context",
         "group",
         "operation",
-        "app",
+        # "app",
         "pod_node_name",
         "quantile",
+        "cluster",
     ],
 }
 
@@ -75,11 +79,17 @@ def merge_current_with_prev(
     prev_df: pd.DataFrame,
     key_cols: list[str],
 ) -> pd.DataFrame:
-    # 1) Определяем ключевые колонки — все, кроме 'values' и 'timestamps'
-    cols = key_cols + ["values", "timestamps"]
-
     if current_df.empty:
         return prev_df
+
+    valid_keys = [
+        k for k in key_cols if k in current_df.columns and k in prev_df.columns
+    ]
+    if len(valid_keys) < 1:
+        # Если нет общих ключей, возвращаем prev_df без изменений
+        return prev_df
+
+    cols = valid_keys + ["values", "timestamps"]
 
     # 2) Выполняем inner-слияние по этим ключам
     df = pd.merge(prev_df, current_df, on=key_cols, suffixes=("_1", "_2"), how="left")
