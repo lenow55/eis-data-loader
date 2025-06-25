@@ -42,7 +42,9 @@ class Worker(multiprocessing.Process):
         self._base_logger: logging.Logger = logging.getLogger(
             f"{__name__}.{self.worker_id}"
         )
-        handler = RotatingFileHandler(f"./logs/worker_id_{self.worker_id}.log")
+        handler = RotatingFileHandler(
+            f"./logs/worker_id_{self.worker_id}.log", maxBytes=10485760, backupCount=5
+        )
         handler.setFormatter(
             logging.Formatter(
                 fmt="%(asctime)s - %(worker_id)s:%(cluster)s:%(funcName)s:%(lineno)d - %(levelname)s - %(message)s"
