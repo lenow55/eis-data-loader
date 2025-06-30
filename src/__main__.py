@@ -49,8 +49,8 @@ if __name__ == "__main__":
     q_size = 8
     start_time = datetime.fromisoformat("2024-09-01T00:00:00")
     # start_time = datetime.fromisoformat("2024-12-28T00:00:00")
-    # end_time = datetime.fromisoformat("2024-12-31T23:00:00")
-    end_time = datetime.fromisoformat("2024-09-01T23:00:00")
+    end_time = datetime.fromisoformat("2025-01-01T00:00:00")
+    # end_time = datetime.fromisoformat("2024-09-01T23:00:00")
     timedeltas = [timedelta(hours=1), timedelta(minutes=20)]
     aggregations = [["pod_node_name"], ["cluster"]]
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
             cluster_name=cluster,
             q_manager=q_manager,
             start_time=start_time,
-            end_time=end_time,
+            end_time=times2load[-1],
             times2load=times2load,
             task_id=task_id,
             metrics_list=[
