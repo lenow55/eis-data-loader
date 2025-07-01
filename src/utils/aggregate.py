@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy.stats import gaussian_kde
 
 COLS_KEYS_MAPPING = {
     "application_stats_error_total": [
@@ -139,3 +140,35 @@ def merge_current_with_prev(
     df = df[cols]
 
     return df
+
+
+def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 200) -> float:
+    """
+    Вычисляет приближённую моду непрерывного массива arr
+    через KDE (Gaussian kernel density estimation).
+
+    Параметры:
+    - arr: одномерный numpy-массив данных.
+    - bw_method: метод выбора ширины окна ('scott', 'silverman' или число).
+    - grid_size: число точек сетки, на которой ищем максимум.
+
+    Возвращает:
+    - x_mode: значение x, при котором KDE достигает максимума.
+    """
+    # 1. Строим KDE
+    kde = gaussian_kde(arr, bw_method=bw_method)
+
+    # 2. Готовим сетку по диапазону данных
+    x_min, x_max = np.nanmin(arr), np.nanmax(arr)
+    if not x_min and not x_max:
+        return np.nan
+
+    grid = np.linspace(x_min, x_max, grid_size)
+
+    # 3. Оцениваем плотность на сетке
+    density = kde(grid)
+
+    # 4. Находим максимум
+    idx_max = np.argmax(density)
+    x_mode = grid[idx_max]
+    return x_mode

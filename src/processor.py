@@ -17,6 +17,7 @@ from src.schemas import LoadComplete
 from src.utils.aggregate import (
     COLS_KEYS_MAPPING,
     merge_current_with_prev,
+    mode_kde,
     safe_quantile,
     values_by_timeperiods_func,
 )
@@ -266,7 +267,6 @@ class Worker(multiprocessing.Process):
         self,
         merged_dataset: pd.DataFrame,
         change_by_timeperiod: pd.DataFrame,
-        quantile: str,
         period: timedelta,
     ):
         for aggregation in self._aggregations:
@@ -274,23 +274,20 @@ class Worker(multiprocessing.Process):
             keys.append(merged_dataset["quantile"])
 
             groups = change_by_timeperiod.groupby(keys)
-            max_df = groups.max().T
-            max_df = max_df.add_suffix("_max")
-            mean_df = groups.mean().T
-            mean_df = mean_df.add_suffix("_mean")
-            std_df = groups.std().T
-            std_df = std_df.add_suffix("_std")
+            q50_df = groups.quantile(q=0.5).T.add_suffix("_q50")
+            q75_df = groups.quantile(q=0.75).T.add_suffix("_q75")
+            q90_df = groups.quantile(q=0.90).T.add_suffix("_q90")
+            q95_df = groups.quantile(q=0.95).T.add_suffix("_q95")
+            q99_df = groups.quantile(q=0.99).T.add_suffix("_q99")
 
-            aggregate_df = max_df.join([mean_df, std_df])
+            aggregate_df = q50_df.join([q75_df, q90_df, q95_df, q99_df])
             self._update_df(
-                f"application_stats_seconds_{quantile}",
+                f"application_stats_seconds",
                 period,
                 "-".join(aggregation),
                 aggregate_df,
             )
-            self.logger.debug(
-                f"application_stats_seconds_{quantile}\n{aggregate_df.head(10)}"
-            )
+            self.logger.debug(f"application_stats_seconds\n{aggregate_df.head(10)}")
 
     def _process_execution_time(
         self,
@@ -300,18 +297,9 @@ class Worker(multiprocessing.Process):
     ):
         self.logger.info("process application_stats_seconds")
 
-        dropnan = lambda a: a[~np.isnan(a)]
-        change_by_timeperiod = values_by_timeperiods.map(dropnan)
+        change_by_timeperiod_mode = values_by_timeperiods.map(mode_kde)
 
-        change_by_timeperiod50 = change_by_timeperiod.map(safe_quantile, q=0.5)
-        change_by_timeperiod75 = change_by_timeperiod.map(safe_quantile, q=0.75)
-        change_by_timeperiod90 = change_by_timeperiod.map(safe_quantile, q=0.9)
-        change_by_timeperiod95 = change_by_timeperiod.map(safe_quantile, q=0.95)
-
-        self._compute_quantile(merged_dataset, change_by_timeperiod50, "q50", period)
-        self._compute_quantile(merged_dataset, change_by_timeperiod75, "q75", period)
-        self._compute_quantile(merged_dataset, change_by_timeperiod90, "q90", period)
-        self._compute_quantile(merged_dataset, change_by_timeperiod95, "q95", period)
+        self._compute_quantile(merged_dataset, change_by_timeperiod_mode, period)
 
     def _preprocess_data(self, task: LoadComplete):
         filename_err = task.metrics["application_stats_error_total"]
