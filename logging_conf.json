@@ -49,6 +49,12 @@
     "src.processor.3": {
       "level": "INFO"
     },
+    "src.processor.4": {
+      "level": "INFO"
+    },
+    "src.processor.5": {
+      "level": "INFO"
+    },
     "LoadClusterTask": {
       "level": "INFO",
       "handlers": [

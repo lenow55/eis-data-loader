@@ -44,7 +44,7 @@ client: S3Client = session.client(
 )
 
 if __name__ == "__main__":
-    count_workers = 5
+    count_workers = 6
     # count_workers = 1
     q_size = 8
     start_time = datetime.fromisoformat("2024-09-01T00:00:00")
