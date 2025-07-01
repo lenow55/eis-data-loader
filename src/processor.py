@@ -302,8 +302,6 @@ class Worker(multiprocessing.Process):
 
         dropnan = lambda a: a[~np.isnan(a)]
         change_by_timeperiod = values_by_timeperiods.map(dropnan)
-        change_by_timeperiod = change_by_timeperiod.map(np.diff)
-        change_by_timeperiod = change_by_timeperiod.map(np.clip, a_min=0, a_max=None)
 
         change_by_timeperiod50 = change_by_timeperiod.map(safe_quantile, q=0.5)
         change_by_timeperiod75 = change_by_timeperiod.map(safe_quantile, q=0.75)
