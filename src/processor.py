@@ -166,7 +166,11 @@ class Worker(multiprocessing.Process):
         )
         change_by_timeperiod_req = change_by_timeperiod_req.map(np.sum)
 
-        change_by_timeperiod = change_by_timeperiod_err.div(change_by_timeperiod_req)
+        change_by_timeperiod = change_by_timeperiod_err.div(
+            change_by_timeperiod_req, fill_value=0
+        )
+        change_by_timeperiod = change_by_timeperiod.fillna(value=-1)
+        change_by_timeperiod = change_by_timeperiod.replace([np.inf, -np.inf], 0)
 
         for aggregation in self._aggregations:
             keys = [merged_dataset_err[col] for col in aggregation]
