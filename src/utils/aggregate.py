@@ -1,8 +1,8 @@
 from datetime import UTC, datetime, timedelta
-from functools import partial
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 COLS_KEYS_MAPPING = {
     "application_stats_error_total": [
@@ -53,25 +53,55 @@ def values_by_timeperiods_func(
     merged_dataset: pd.DataFrame,
     start_time: datetime,
     period: timedelta,
-):
-    end_time: datetime = start_time + timedelta(hours=1)
-    time_intervals: np.ndarray = pd.date_range(
-        start_time, end_time, freq=period, tz=UTC
-    ).to_pydatetime()
-    # Формируем интервалы (start, end) как пары соседних времён
-    time_intervals_list: list[tuple[datetime, datetime]] = [
-        (time_intervals[i], time_intervals[i + 1])
-        for i in range(len(time_intervals) - 1)
-    ]
-    clamp_in_timedelta_p = partial(
-        clamp_in_timedelta,
-        time_intervals=time_intervals_list,
-        none_to_zero=False,
-    )
-    values_by_timeperiods = merged_dataset.loc[:, ["timestamps", "values"]].apply(
-        clamp_in_timedelta_p, axis=1
-    )
-    return values_by_timeperiods
+    non2zero: bool = False,
+) -> pd.DataFrame:
+    end_time = start_time + timedelta(hours=1)
+    time_edges = pd.date_range(start=start_time, end=end_time, freq=period, tz=UTC)
+    time_edges_np = time_edges.to_numpy(dtype="datetime64[ns]")
+
+    results = []
+    interval_count = len(time_edges_np) - 1
+
+    for row in merged_dataset.itertuples(index=False):
+        ts_list = row.timestamps
+        val_list = row.values
+
+        timestamps: NDArray["np.datetime64"] = np.array(ts_list, dtype="datetime64[ns]")
+        values: NDArray[np.float64] = np.array(val_list, dtype=np.float64)
+
+        # фильтрация None
+        valid_mask = (~pd.isnull(timestamps)) & (~pd.isnull(values))
+        timestamps = timestamps[valid_mask]
+        values = values[valid_mask]
+
+        if timestamps.size > 1:
+            sort_idx = np.argsort(timestamps)
+            timestamps = timestamps[sort_idx]
+            values = values[sort_idx]
+
+        idxs = np.searchsorted(timestamps, time_edges_np)
+        row_data: list[NDArray[np.float64]] = [
+            np.empty(0, dtype=float)
+        ] * interval_count
+        for i in range(interval_count):
+            left, right = idxs[i], idxs[i + 1]
+            selected = values[left:right]
+
+            if right < len(values):
+                if selected.size == 0:
+                    row_data[i] = values[right : right + 1]
+                else:
+                    out = np.empty(selected.size + 1, dtype=np.float64)
+                    out[:-1] = selected
+                    out[-1] = values[right]
+                    row_data[i] = out
+            else:
+                row_data[i] = selected
+
+        row_series = pd.Series(row_data, index=time_edges[1:], dtype=object)
+        results.append(row_series)
+
+    return pd.DataFrame(results)
 
 
 def merge_current_with_prev(
@@ -109,48 +139,3 @@ def merge_current_with_prev(
     df = df[cols]
 
     return df
-
-
-def clamp_in_timedelta(
-    timestamps_values: tuple[list[datetime], list[float]],
-    time_intervals: list[tuple[datetime, datetime]],
-    none_to_zero: bool = True,
-):
-    """
-    Извлекает значения из заданных временных интервалов с добавлением первого значения за границей интервала.
-
-    Аргументы:
-        timestamps_values (tuple[list[datetime], list[float]]): Кортеж из списков меток времени и соответствующих значений.
-        time_intervals (list[tuple[datetime, datetime]]): Список временных интервалов (start, end).
-        none_to_zero (bool, optional): Заменять ли значения None на 0. По умолчанию True.
-
-    Возвращает:
-        list[tuple[datetime, datetime, np.ndarray]]: Список кортежей (start, end, значения), где значения — numpy-массив значений за интервал с добавленным первым значением после конца.
-    """
-    timestamps, values = timestamps_values
-    if len(timestamps) != len(values):
-        raise ValueError("Length of timestamps and values must be equal")
-
-    result = pd.Series()
-
-    for start, end in time_intervals:
-        # Выбираем индексы меток времени, попадающих в интервал [start, end)
-        selected_indices = [i for i, t in enumerate(timestamps) if start <= t < end]
-        # Собираем соответствующие значения
-        selected_values = [values[i] for i in selected_indices]
-
-        # Находим первое значение после конца интервала (если есть) и добавляем его
-        after_end_indices = [i for i, t in enumerate(timestamps) if t >= end]
-        if after_end_indices:
-            val_after = values[after_end_indices[0]]
-            selected_values.append(val_after)
-
-        # При необходимости заменяем None на 0
-        if none_to_zero:
-            selected_values = [0 if v is None else v for v in selected_values]
-
-        # Конвертируем в numpy массив с типом float
-        filtered_values = np.array(selected_values, dtype=float)
-        result[end] = filtered_values
-
-    return result
