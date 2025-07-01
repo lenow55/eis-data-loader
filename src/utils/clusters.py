@@ -1,99 +1,99 @@
 CLUSTERS = [
-    "common-dstore-ok-archiving",
-    "common-egrul-egrip-client",
-    "common-filestore-techsupp",
-    "common-gisnr-request-service",
-    "common-knowledge-base",
-    "common-lko",
-    "common-planner",
-    "common-smev-adapter",
-    "common-tech-supp",
-    "common-user-control",
-    "epz-activity",
-    "epz-analytics-aggregator",
-    "epz-complaint",
-    "epz-contract-fz223",
-    "epz-contract-opensearch",
-    "epz-contract-reporting",
-    "epz-contract",
-    "epz-control-result",
-    "epz-customer-reports",
-    "epz-customer223",
-    "epz-dishonest-supplier",
-    "epz-dizk",
-    "epz-etp",
-    "epz-farm",
-    "epz-goods-works-services",
-    "epz-inspection-plan",
-    "epz-ktru-opensearch",
-    "epz-ktru",
-    "epz-legal-acts",
-    "epz-main",
-    "epz-mechproducts",
-    "epz-mobile-push",
-    "epz-mobile-web",
-    "epz-normalization-rules",
-    "epz-nsi",
-    "epz-oboz",
-    "epz-opendata",
-    "epz-order-clause",
-    "epz-order-doc",
-    "epz-order-opensearch",
-    "epz-order-plan",
+    # "common-dstore-ok-archiving", # пустой
+    # "common-egrul-egrip-client", # пустой
+    # "common-filestore-techsupp", # ок
+    # "common-gisnr-request-service", # пустой
+    # "common-knowledge-base", # ок
+    # "common-lko", # ок
+    # "common-planner", # ок
+    # "common-smev-adapter", # ок
+    # "common-tech-supp",  # ок
+    # "common-user-control",  # ок
+    # "epz-activity", # пустой
+    # "epz-analytics-aggregator", # пустой
+    # "epz-complaint", # ок
+    # "epz-contract-fz223", # ок
+    # "epz-contract-opensearch", # пустой в application_stats_error_total
+    # "epz-contract-reporting",  # пустой в application_stats_error_total
+    # "epz-contract", # ок
+    # "epz-control-result", # ок
+    # "epz-customer-reports", # ок
+    # "epz-customer223", # ок
+    # "epz-dishonest-supplier", # ок
+    # "epz-dizk", # ок
+    # "epz-etp", # ок
+    # "epz-farm", # пустой в application_stats_error_total
+    # "epz-goods-works-services", # ок
+    # "epz-inspection-plan", # ок
+    # "epz-ktru-opensearch", # пустой application_stats_error_total
+    # "epz-ktru", # ок
+    # "epz-legal-acts", # ок
+    # "epz-main", # ок
+    # "epz-mechproducts", # этот кластер пустой
+    # "epz-mobile-push", # ок
+    # "epz-mobile-web", # ок
+    # "epz-normalization-rules", # ок
+    # "epz-nsi", # ок
+    # "epz-oboz", # ок
+    # "epz-opendata", # ок
+    # "epz-order-clause", # ок
+    # "epz-order-doc", # ок
+    # "epz-order-opensearch", # пустой application_stats_error_total
+    # "epz-order-plan", # ок
     "epz-order",
-    "epz-organization",
-    "epz-pricereq",
-    "epz-purchase-plan-fz44",
-    "epz-rdik-opensearch",
-    "epz-rdik",
-    "epz-rep",
-    "epz-revenue",
-    "epz-rirz",
-    "epz-rkpo",
-    "epz-ropt",
-    "epz-sphinx-server-extractor-223",
-    "epz-sphinx-server-extractor-44-cr",
-    "epz-sphinx-server-extractor-44-doc",
-    "epz-sphinx-server-extractor-44-epz",
-    "epz-sphinx-server-extractor-44-gza",
-    "epz-sphinx-server-extractor-44-op",
-    "epz-sphinx-server-extractor-44-rk44",
-    "epz-sphinx-server-extractor-44-rz44",
-    "epz-sphinx-server-extractor-94",
-    "epz-typal-clause",
+    # "epz-organization", # ок
+    # "epz-pricereq", # ок
+    # "epz-purchase-plan-fz44", # ок
+    # "epz-rdik-opensearch", # пустой в application_stats_error_total
+    # "epz-rdik", # ок
+    # "epz-rep", # ок
+    # "epz-revenue", # пустой в application_stats_error_total
+    # "epz-rirz", # пустой в application_stats_error_total
+    # "epz-rkpo", # ок
+    # "epz-ropt", # пустой в application_stats_error_total
+    # "epz-sphinx-server-extractor-223", # ок
+    # "epz-sphinx-server-extractor-44-cr", # ок
+    # "epz-sphinx-server-extractor-44-doc", # ок
+    # "epz-sphinx-server-extractor-44-epz", # ок
+    # "epz-sphinx-server-extractor-44-gza", # ок
+    # "epz-sphinx-server-extractor-44-op", # ок
+    # "epz-sphinx-server-extractor-44-rk44", # ок
+    # "epz-sphinx-server-extractor-44-rz44", # ок
+    # "epz-sphinx-server-extractor-94", # ок
+    # "epz-typal-clause", # ок
     "epz-unscheduled-inspection",
-    "fz223-clause",
-    "fz223-contract-account",
-    "fz223-contractprivate",
-    "fz223-customer-list",
-    "fz223-dstore-rc223-archiving",
-    "fz223-dstore-rc223",
-    "fz223-dstore-rn223-archiving",
-    "fz223-dstore-rn223",
-    "fz223-dstore-rp223-archiving",
-    "fz223-dstore-rp223",
-    "fz223-exclusion-notice",
-    "fz223-filestore",
-    "fz223-fstore",
-    "fz223-guarantee",
-    "fz223-integration-export",
-    "fz223-list-gws",
-    "fz223-mech-engineering",
-    "fz223-monitoring",
-    "fz223-plan",
-    "fz223-ppa",
-    "fz223-private",
-    "fz223-purchase-account",
-    "fz223-purchase-monitoring",
-    "fz223-purchase",
-    "fz223-urd-eis",
-    "lkp-auth",
-    "lkp-bus",
+    # "fz223-clause", # ок
+    # "fz223-contract-account", # ок
+    # "fz223-contractprivate", # ок
+    # "fz223-customer-list", # пустой в application_stats_error_total
+    # "fz223-dstore-rc223-archiving", # пустой в application_stats_error_total
+    # "fz223-dstore-rc223", # ок
+    # "fz223-dstore-rn223-archiving", # пустой в application_stats_error_total
+    # "fz223-dstore-rn223", # ок
+    # "fz223-dstore-rp223-archiving", # пустой в application_stats_error_total
+    # "fz223-dstore-rp223", # ок
+    # "fz223-exclusion-notice", # пустой в application_stats_error_total
+    # "fz223-filestore", # ок
+    # "fz223-fstore", # ок
+    # "fz223-guarantee", # пустой в application_stats_error_total
+    # "fz223-integration-export", # пустой в application_stats_error_total
+    # "fz223-list-gws", # ок
+    # "fz223-mech-engineering", # пустой в application_stats_error_total
+    # "fz223-monitoring", # пустой в application_stats_error_total
+    # "fz223-plan", # ок
+    # "fz223-ppa", # ок
+    # "fz223-private", # ок
+    # "fz223-purchase-account", # ок
+    # "fz223-purchase-monitoring", # пустой в application_stats_error_total
+    # "fz223-purchase", # ок
+    # "fz223-urd-eis", # пустой в application_stats_error_total
+    # "lkp-auth", # ок
+    # "lkp-bus", # пустой в application_stats_error_total
     "lkp-complaints",
-    "lkp-dstore-ea-archiving",
-    "lkp-dstore-ea",
-    "lkp-dstore-lkp-archiving",
-    "lkp-dstore-lkp",
+    # "lkp-dstore-ea-archiving", # пустой в application_stats_error_total
+    # "lkp-dstore-ea", # ок
+    # "lkp-dstore-lkp-archiving", # пустой в application_stats_error_total
+    # "lkp-dstore-lkp", # пустой в application_stats_error_total
     "lkp-eact",
     "lkp-edo-adapter-lkp",
     "lkp-els",
