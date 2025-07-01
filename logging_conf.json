@@ -33,7 +33,9 @@
   "loggers": {
     "__main__": {
       "level": "DEBUG",
-      "handlers": ["file"]
+      "handlers": [
+        "file"
+      ]
     },
     "src.processor.0": {
       "level": "INFO"
@@ -48,8 +50,10 @@
       "level": "INFO"
     },
     "LoadClusterTask": {
-      "level": "DEBUG",
-      "handlers": ["loader_file"]
+      "level": "INFO",
+      "handlers": [
+        "loader_file"
+      ]
     }
   }
 }
