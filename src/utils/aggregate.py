@@ -3,8 +3,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.stats import gaussian_kde
-from threadpoolctl import threadpool_limits
+from scipy.signal import fftconvolve
 
 COLS_KEYS_MAPPING = {
     "application_stats_error_total": [
@@ -143,43 +142,51 @@ def merge_current_with_prev(
     return df
 
 
-def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 100) -> float:
+def mode_fft_via_hist(
+    arr: np.ndarray, grid_size: int = 50, bandwidth_arg: float | None = None
+) -> float:
     """
-    Вычисляет приближённую моду непрерывного массива arr
-    через KDE (Gaussian kernel density estimation).
+    Приближённая мода через FFT-свертку гистограммы.
 
     Параметры:
-    - arr: одномерный numpy-массив данных.
-    - bw_method: метод выбора ширины окна ('scott', 'silverman' или число).
-    - grid_size: число точек сетки, на которой ищем максимум.
+    - arr: одномерный numpy-массив.
+    - grid_size: число бинов в гистограмме.
+    - bandwidth: ширина гауссовского ядра. Если None, используется правило Сильвермана.
 
     Возвращает:
-    - x_mode: значение x, при котором KDE достигает максимума.
+    - x_mode: центр бина, в котором оценённая плотность максимальна.
     """
-
-    if arr.shape == (0,):
+    # Пустой массив
+    if arr.size == 0:
         return np.nan
 
-    # проверяем уникальность
+    # Все значения одинаковые
     unique_vals = np.unique(arr)
-    if len(unique_vals) < 2:
+    if unique_vals.size < 2:
         return unique_vals[0]
 
-    with threadpool_limits(limits=3):
-        # 1. Строим KDE
-        kde = gaussian_kde(arr, bw_method=bw_method)
+    # 1) Строим гистограмму (плотность)
+    counts, bin_edges = np.histogram(arr, bins=grid_size, density=True)
+    dx = bin_edges[1] - bin_edges[0]
+    n = arr.size
+    sigma = arr.std(ddof=1)
 
-        # 2. Готовим сетку по диапазону данных
-        x_min, x_max = np.nanmin(arr), np.nanmax(arr)
-        if not x_min and not x_max:
-            return np.nan
+    # 2) Вычисляем bandwidth по правилу Сильвермана, если не задано
+    if bandwidth_arg is None:
+        bandwidth = 1.06 * sigma * n ** (-1 / 5)
+    else:
+        bandwidth = bandwidth_arg
 
-        grid = np.linspace(x_min, x_max, grid_size)
+    # 3) Формируем гауссовское ядро, охватывающее ±4σ
+    L = max(int(np.ceil(8 * bandwidth / dx)), 1)
+    kernel_x = np.linspace(-4 * bandwidth, 4 * bandwidth, L)
+    kernel = np.exp(-0.5 * (kernel_x / bandwidth) ** 2)
+    kernel /= kernel.sum()
 
-        # 3. Оцениваем плотность на сетке
-        density = kde(grid)
+    # 4) Быстрая свёртка
+    density = fftconvolve(counts, kernel, mode="same")
 
-    # 4. Находим максимум
-    idx_max = np.argmax(density)
-    x_mode = grid[idx_max]
+    # 5) Индекс максимума и возвращаем центр бина
+    idx = np.argmax(density)
+    x_mode = 0.5 * (bin_edges[idx] + bin_edges[idx + 1])
     return x_mode
