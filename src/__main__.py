@@ -44,13 +44,13 @@ client: S3Client = session.client(
 )
 
 if __name__ == "__main__":
-    count_workers = 6
-    # count_workers = 1
+    # count_workers = 6
+    count_workers = 1
     q_size = 8
     start_time = datetime.fromisoformat("2024-09-01T00:00:00")
     # start_time = datetime.fromisoformat("2024-12-28T00:00:00")
-    end_time = datetime.fromisoformat("2025-01-01T00:00:00")
-    # end_time = datetime.fromisoformat("2024-09-01T23:00:00")
+    # end_time = datetime.fromisoformat("2025-01-01T00:00:00")
+    end_time = datetime.fromisoformat("2024-09-01T23:00:00")
     timedeltas = [timedelta(hours=1), timedelta(minutes=20)]
     aggregations = [["cluster"]]
 
