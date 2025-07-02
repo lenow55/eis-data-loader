@@ -67,11 +67,9 @@ def values_by_timeperiods_func(
         ts_list = row["timestamps"]
         val_list = row["values"]
 
+        values = np.array(val_list, dtype=np.float64)
         timestamps = pd.DatetimeIndex(ts_list, tz=UTC).to_numpy()
-        values: NDArray[np.float64] = np.array(val_list, dtype=np.float64)
-
-        # фильтрация None
-        valid_mask = (~pd.isnull(timestamps)) & (~pd.isnull(values))
+        valid_mask = ~pd.isnull(timestamps)
         timestamps = timestamps[valid_mask]
         values = values[valid_mask]
 
