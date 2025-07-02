@@ -281,6 +281,7 @@ class Worker(multiprocessing.Process):
             q99_df = groups.quantile(q=0.99).T.add_suffix("_q99")
 
             aggregate_df = q50_df.join([q75_df, q90_df, q95_df, q99_df])
+            aggregate_df.columns = aggregate_df.columns.droplevel(0)
             self._update_df(
                 f"application_stats_seconds",
                 period,
