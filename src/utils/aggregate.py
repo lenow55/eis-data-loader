@@ -155,6 +155,15 @@ def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 200) ->
     Возвращает:
     - x_mode: значение x, при котором KDE достигает максимума.
     """
+
+    if arr.shape == (0,):
+        return np.nan
+
+    # проверяем уникальность
+    unique_vals = np.unique(arr)
+    if len(unique_vals) < 2:
+        return unique_vals[0]
+
     # 1. Строим KDE
     kde = gaussian_kde(arr, bw_method=bw_method)
 
