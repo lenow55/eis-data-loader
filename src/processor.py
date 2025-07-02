@@ -299,6 +299,8 @@ class Worker(multiprocessing.Process):
 
         change_by_timeperiod_mode = values_by_timeperiods.map(mode_fft_via_hist)
 
+        self.logger.info("compute mode for application_stats_seconds")
+
         self._compute_quantile(merged_dataset, change_by_timeperiod_mode, period)
 
     def _preprocess_data(self, task: LoadComplete):
