@@ -142,7 +142,7 @@ def merge_current_with_prev(
     return df
 
 
-def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 200) -> float:
+def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 100) -> float:
     """
     Вычисляет приближённую моду непрерывного массива arr
     через KDE (Gaussian kernel density estimation).
