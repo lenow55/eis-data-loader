@@ -58,16 +58,16 @@ def values_by_timeperiods_func(
 ) -> pd.DataFrame:
     end_time = start_time + timedelta(hours=1)
     time_edges = pd.date_range(start=start_time, end=end_time, freq=period, tz=UTC)
-    time_edges_np = time_edges.to_numpy(dtype="datetime64[ns]")
+    time_edges_np = time_edges.to_numpy()
 
     results = []
     interval_count = len(time_edges_np) - 1
 
-    for row in merged_dataset.itertuples(index=False):
-        ts_list = row.timestamps
-        val_list = row.values
+    for index, row in merged_dataset.iterrows():
+        ts_list = row["timestamps"]
+        val_list = row["values"]
 
-        timestamps: NDArray["np.datetime64"] = np.array(ts_list, dtype="datetime64[ns]")
+        timestamps = pd.DatetimeIndex(ts_list, tz=UTC).to_numpy()
         values: NDArray[np.float64] = np.array(val_list, dtype=np.float64)
 
         # фильтрация None
