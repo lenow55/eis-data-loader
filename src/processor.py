@@ -297,11 +297,10 @@ class Worker(multiprocessing.Process):
     ):
         self.logger.info("process application_stats_seconds")
 
-        change_by_timeperiod_mode = values_by_timeperiods.map(mode_fft_via_hist)
+        change_by_timeperiod_median = values_by_timeperiods.map(np.nanmedian)
 
-        self.logger.info("compute mode for application_stats_seconds")
 
-        self._compute_quantile(merged_dataset, change_by_timeperiod_mode, period)
+        self._compute_quantile(merged_dataset, change_by_timeperiod_median, period)
 
     def _preprocess_data(self, task: LoadComplete):
         filename_err = task.metrics["application_stats_error_total"]
