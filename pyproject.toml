@@ -16,6 +16,7 @@ dependencies = [
   "boto3-stubs[boto3,s3] (>=1.38.37,<2.0.0)",
   "pandas-stubs (>=2.2.3.250527,<3.0.0.0)",
   "pandarallel (>=1.6.5,<2.0.0)",
+  "threadpoolctl (>=3.6.0,<4.0.0)",
 ]
 
 

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import gaussian_kde
+from threadpoolctl import threadpool_limits
 
 COLS_KEYS_MAPPING = {
     "application_stats_error_total": [
@@ -164,18 +165,19 @@ def mode_kde(arr: np.ndarray, bw_method: str = "scott", grid_size: int = 100) ->
     if len(unique_vals) < 2:
         return unique_vals[0]
 
-    # 1. Строим KDE
-    kde = gaussian_kde(arr, bw_method=bw_method)
+    with threadpool_limits(limits=3):
+        # 1. Строим KDE
+        kde = gaussian_kde(arr, bw_method=bw_method)
 
-    # 2. Готовим сетку по диапазону данных
-    x_min, x_max = np.nanmin(arr), np.nanmax(arr)
-    if not x_min and not x_max:
-        return np.nan
+        # 2. Готовим сетку по диапазону данных
+        x_min, x_max = np.nanmin(arr), np.nanmax(arr)
+        if not x_min and not x_max:
+            return np.nan
 
-    grid = np.linspace(x_min, x_max, grid_size)
+        grid = np.linspace(x_min, x_max, grid_size)
 
-    # 3. Оцениваем плотность на сетке
-    density = kde(grid)
+        # 3. Оцениваем плотность на сетке
+        density = kde(grid)
 
     # 4. Находим максимум
     idx_max = np.argmax(density)
