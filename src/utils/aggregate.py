@@ -142,6 +142,17 @@ def merge_current_with_prev(
     return df
 
 
+def safe_median(arr: np.ndarray):
+    """
+    Медиана с проверкой на пустоту массива
+    """
+    # Пустой массив
+    if arr.size == 0:
+        return np.nan
+    res = np.nanmedian(arr)
+    return res
+
+
 def mode_fft_via_hist(
     arr: np.ndarray, grid_size: int = 50, bandwidth_arg: float | None = None
 ) -> float:

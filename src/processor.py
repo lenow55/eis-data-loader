@@ -18,6 +18,7 @@ from src.utils.aggregate import (
     COLS_KEYS_MAPPING,
     merge_current_with_prev,
     mode_fft_via_hist,
+    safe_median,
     values_by_timeperiods_func,
 )
 from src.utils.log_handlers import RotatingFileHandler
@@ -297,7 +298,7 @@ class Worker(multiprocessing.Process):
     ):
         self.logger.info("process application_stats_seconds")
 
-        change_by_timeperiod_median = values_by_timeperiods.map(np.nanmedian)
+        change_by_timeperiod_median = values_by_timeperiods.map(safe_median)
 
 
         self._compute_quantile(merged_dataset, change_by_timeperiod_median, period)
