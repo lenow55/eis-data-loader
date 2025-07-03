@@ -121,7 +121,7 @@ def merge_current_with_prev(
     cols = valid_keys + ["values", "timestamps"]
 
     # 2) Выполняем inner-слияние по этим ключам
-    df = pd.merge(prev_df, current_df, on=key_cols, suffixes=("_1", "_2"), how="left")
+    df = pd.merge(prev_df, current_df, on=valid_keys, suffixes=("_1", "_2"), how="left")
 
     # 3) Заменяем NaN в столбцах values_2 и timestamps_2 на пустые списки
     val_2_isna = df["values_2"].isna()
