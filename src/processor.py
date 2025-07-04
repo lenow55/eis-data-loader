@@ -300,7 +300,6 @@ class Worker(multiprocessing.Process):
 
         change_by_timeperiod_median = values_by_timeperiods.map(safe_median)
 
-
         self._compute_quantile(merged_dataset, change_by_timeperiod_median, period)
 
     def _preprocess_data(self, task: LoadComplete):
@@ -340,8 +339,6 @@ class Worker(multiprocessing.Process):
         return result_preprocessing
 
     def _perform_merge(self, preprocessed_data: dict[str, pd.DataFrame], is_end: bool):
-        futures: dict[str, Future[pd.DataFrame]] = {}
-
         result: dict[str, pd.DataFrame] = {}
         for metric_name, metric_data in preprocessed_data.items():
             self.logger.info(f"Try merge {metric_name}")
@@ -364,25 +361,22 @@ class Worker(multiprocessing.Process):
 
             # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
             previous_dataset = self._previous_datasets[metric_name]
-            future = self.nested_executor.submit(
-                merge_current_with_prev,
-                current_df=metric_data,
-                prev_df=previous_dataset,
-                key_cols=COLS_KEYS_MAPPING[metric_name],
-            )
-            futures.update({metric_name: future})
-            self._previous_datasets[metric_name] = metric_data
 
-        for metric, future in futures.items():
-            preproces_res_df = future.result()
-            result.update({metric: preproces_res_df})
-            self.logger.info(f"Merged {metric}")
+            result.update(
+                {
+                    metric_name: merge_current_with_prev(
+                        current_df=metric_data,
+                        prev_df=previous_dataset,
+                        key_cols=COLS_KEYS_MAPPING[metric_name],
+                    )
+                }
+            )
+            self.logger.info(f"Merged {metric_name}")
+            self._previous_datasets[metric_name] = metric_data
 
         return result
 
     def _perform_values_by_timedelta(self, merged_data: dict[str, pd.DataFrame]):
-        futures: dict[tuple[str, timedelta], Future[pd.DataFrame]] = {}
-
         result: dict[tuple[str, timedelta], pd.DataFrame] = {}
 
         for metric_name, metric_data in merged_data.items():
@@ -394,21 +388,16 @@ class Worker(multiprocessing.Process):
                 )
 
                 # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
-                future = self.nested_executor.submit(
-                    values_by_timeperiods_func,
+                res_df = values_by_timeperiods_func(
                     merged_dataset=metric_data,
                     start_time=self._previous_time,
                     period=period,
                 )
-                futures.update({(metric_name, period): future})
+                self.logger.info(
+                    f"Computed values_by_timeperiods {metric_name}; timedelta: {period}"
+                )
 
-        for metric_td, future in futures.items():
-            metric, period = metric_td
-            res_df = future.result()
-            result.update({(metric, period): res_df})
-            self.logger.info(
-                f"Computed values_by_timeperiods {metric}; timedelta: {period}"
-            )
+                result.update({(metric_name, period): res_df})
 
         return result
 
