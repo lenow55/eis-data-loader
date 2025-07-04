@@ -66,9 +66,10 @@ def values_by_timeperiods_func(
     end_time = start_time + timedelta(hours=1)
     edges = pd.date_range(start=start_time, end=end_time + period, freq=period, tz=UTC)
 
+    df = merged_dataset.loc[:, ["timestamps", "values"]].copy()
     # 2) Explode — из wide в long
     df = (
-        merged_dataset.reset_index()
+        df.reset_index()
         .rename(columns={"index": "row_id"})
         .explode(["timestamps", "values"])
     )
