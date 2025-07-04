@@ -52,55 +52,74 @@ def unix_ts2datetime(timestamps: list[int]):
 
 def values_by_timeperiods_func(
     merged_dataset: pd.DataFrame,
-    start_time: datetime,
+    start_time: pd.Timestamp,
     period: timedelta,
-    non2zero: bool = False,
+    take_next: bool = True,
 ) -> pd.DataFrame:
+    """
+    Развёртка + группировка в списки, с опциональным захватом первой
+    точки за концом каждого интервала (take_next=True).
+    """
+
+    # 1) Границы интервалов (closed='left'): [edges[i], edges[i+1])
     end_time = start_time + timedelta(hours=1)
-    time_edges = pd.date_range(start=start_time, end=end_time, freq=period, tz=UTC)
-    time_edges_np = time_edges.to_numpy()
+    edges = pd.date_range(start=start_time, end=end_time + period, freq=period, tz=UTC)
 
-    results = []
-    interval_count = len(time_edges_np) - 1
+    # 2) Explode — из wide в long
+    df = (
+        merged_dataset.reset_index()
+        .rename(columns={"index": "row_id"})
+        .explode(["timestamps", "values"])
+    )
 
-    for index, row in merged_dataset.iterrows():
-        ts_list = row["timestamps"]
-        val_list = row["values"]
+    # 3) Преобразуем раз и навсегда
+    df["timestamps"] = pd.to_datetime(df["timestamps"], utc=True)
 
-        values = np.array(val_list, dtype=np.float64)
-        timestamps = pd.DatetimeIndex(ts_list, tz=UTC).to_numpy()
-        valid_mask = ~pd.isnull(timestamps)
-        timestamps = timestamps[valid_mask]
-        values = values[valid_mask]
+    # 4) Нумерация бинов 0..len(edges)-2, всё вне — NaN
+    df["bin"] = pd.cut(df["timestamps"], bins=edges, right=False, labels=False)  # pyright: ignore[reportArgumentType, reportCallIssue]
 
-        if timestamps.size > 1:
-            sort_idx = np.argsort(timestamps)
-            timestamps = timestamps[sort_idx]
-            values = values[sort_idx]
+    # Оставим только валидные
+    orig = df.dropna(subset=["bin"]).copy()
+    orig["bin"] = orig["bin"].astype(int)
 
-        idxs = np.searchsorted(timestamps, time_edges_np)
-        row_data: list[NDArray[np.float64]] = [
-            np.empty(0, dtype=float)
-        ] * interval_count
-        for i in range(interval_count):
-            left, right = idxs[i], idxs[i + 1]
-            selected = values[left:right]
+    if take_next:
+        # 5a) Для каждой (row_id, bin) найдём первую точку
+        first = (
+            orig.sort_values(["row_id", "timestamps"])
+            .groupby(["row_id", "bin"], sort=False)["values"]
+            .first()
+            .reset_index()
+        )
 
-            if right < len(values):
-                if selected.size == 0:
-                    row_data[i] = values[right : right + 1]
-                else:
-                    out = np.empty(selected.size + 1, dtype=np.float64)
-                    out[:-1] = selected
-                    out[-1] = values[right]
-                    row_data[i] = out
-            else:
-                row_data[i] = selected
+        # 5b) Берём только группы bin>0 и «сдвигаем» их на один влево
+        extra = first[first["bin"] > 0].copy()
+        extra["bin"] = extra["bin"] - 1
 
-        row_series = pd.Series(row_data, index=time_edges[1:], dtype=object)
-        results.append(row_series)
+        # 5c) Объединяем оригинальные и «экстра»-строки
+        combined = pd.concat(
+            [orig[["row_id", "bin", "values"]], extra[["row_id", "bin", "values"]]],
+            ignore_index=True,
+        )
+    else:
+        combined = orig[["row_id", "bin", "values"]]
 
-    return pd.DataFrame(results)
+    # 6) Снова группируем в списки и разворачиваем в wide
+    grouped = (
+        combined.groupby(["row_id", "bin"], sort=False)["values"]
+        .agg(list)
+        .unstack(fill_value=[])  # pyright: ignore[reportArgumentType]
+    )
+
+    # 7) Восстанавливаем оригинальный индекс строк и метки столбцов
+    new_cols = edges[1 : len(grouped.columns) + 1]
+    grouped.index = merged_dataset.index
+    grouped.columns = new_cols
+
+    # 8) берём все колонки кроме последней
+    if new_cols[-1] > end_time:
+        grouped = grouped.iloc[:, 0:-1]
+
+    return grouped
 
 
 def merge_current_with_prev(
