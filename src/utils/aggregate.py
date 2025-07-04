@@ -52,7 +52,7 @@ def unix_ts2datetime(timestamps: list[int]):
 
 def values_by_timeperiods_func(
     merged_dataset: pd.DataFrame,
-    start_time: pd.Timestamp,
+    start_time: datetime,
     period: timedelta,
     take_next: bool = True,
 ) -> pd.DataFrame:
@@ -107,8 +107,8 @@ def values_by_timeperiods_func(
     # 6) Снова группируем в списки и разворачиваем в wide
     grouped = (
         combined.groupby(["row_id", "bin"], sort=False)["values"]
-        .agg(list)
-        .unstack(fill_value=[])  # pyright: ignore[reportArgumentType]
+        .agg(lambda x: np.array(list(x)))
+        .unstack(fill_value=np.array([]))  # pyright: ignore[reportArgumentType]
     )
 
     # 7) Восстанавливаем оригинальный индекс строк и метки столбцов
@@ -116,7 +116,12 @@ def values_by_timeperiods_func(
     grouped.index = merged_dataset.index
     grouped.columns = new_cols
 
-    # 8) берём все колонки кроме последней
+    # 8) Проверка на пустоту колонок
+    if len(new_cols) == 0:
+        # Вернуть пустой DataFrame с тем же индексом, что и у merged_dataset
+        return pd.DataFrame(index=merged_dataset.index)
+
+    # 9) берём все колонки кроме последней
     if new_cols[-1] > end_time:
         grouped = grouped.iloc[:, 0:-1]
 
