@@ -62,6 +62,7 @@ def values_by_timeperiods_func(
     """
 
     # 1) Границы интервалов (closed='left'): [edges[i], edges[i+1])
+    start_time = start_time.replace(tzinfo=UTC)
     end_time = start_time + timedelta(hours=1)
     edges = pd.date_range(start=start_time, end=end_time + period, freq=period, tz=UTC)
 
