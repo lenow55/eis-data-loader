@@ -380,12 +380,67 @@ class Worker(multiprocessing.Process):
                 f"start processing {metric} time: {metric_time.isoformat()}"
             )
 
+    def _process_task(
+        self, task: LoadComplete, previous_merge: dict[str, pd.DataFrame] | None = None
+    ):
+        if not isinstance(previous_merge, dict):
+            result_preprocessing = self._preprocess_data(task)
+
+            result_merge = self._perform_merge(result_preprocessing, task)
+        else:
+            result_merge = previous_merge
+
+        self.debug_time()
+
+        result_val_by_period = self._perform_values_by_timedelta(
+            merged_data=result_merge, task=task
+        )
+
+        grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = defaultdict(dict)
+        for key, item in result_val_by_period.items():
+            metric, period = key
+            if metric == "application_stats_error_total":
+                self._process_error_total(result_merge[metric], item, period)
+            if metric == "application_stats_seconds_count":
+                self._process_seconds_count(result_merge[metric], item, period)
+            if metric == "application_stats_seconds":
+                self._process_execution_time(result_merge[metric], item, period)
+            grouped[period][metric] = item
+
+        for period, metric_group in grouped.items():
+            if (
+                "application_stats_error_total" in metric_group
+                and "application_stats_seconds_count" in metric_group
+            ):
+                self._process_devide_error_by_requests(
+                    merged_dataset_err=result_merge["application_stats_error_total"],
+                    merged_dataset_req=result_merge["application_stats_seconds_count"],
+                    values_by_timeperiods_err=metric_group[
+                        "application_stats_error_total"
+                    ],
+                    values_by_timeperiods_req=metric_group[
+                        "application_stats_seconds_count"
+                    ],
+                    period=period,
+                )
+        return result_merge
+
+    def _save_cluster(self):
+        for metric, item in self._resulted_datasets.items():
+            for period, item2 in item.items():
+                for aggregate, item3 in item2.items():
+                    self.logger.info(
+                        f"END: {metric} -> {period} -> {aggregate}: shape: {item3.shape}"
+                    )
+                    file_path = f"datasets/{self._cluster_in_progress}_{metric}_{period.total_seconds()}_{aggregate}.csv"
+                    item3.to_csv(file_path)
+                    self.logger.info(f"Saved: {file_path}")
+
     @override
     def run(self):
         while True:
             try:
                 task = self.queue_in.get(block=True, timeout=10)
-                self.logger.info(f"Accept task datetime: {task.loaded_datetime}")
 
                 if not isinstance(self._cluster_in_progress, str):
                     self._cluster_in_progress = task.cluster_name
@@ -396,50 +451,9 @@ class Worker(multiprocessing.Process):
                     self.logger.extra.update(
                         {"cluster": str(self._cluster_in_progress)}
                     )
+                self.logger.info(f"Accept task datetime: {task.loaded_datetime}")
 
-                result_preprocessing = self._preprocess_data(task)
-
-                result_merge = self._perform_merge(result_preprocessing, task)
-
-                result_val_by_period = self._perform_values_by_timedelta(
-                    merged_data=result_merge, task=task
-                )
-
-                self.debug_time()
-
-                grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = defaultdict(
-                    dict
-                )
-                for key, item in result_val_by_period.items():
-                    metric, period = key
-                    if metric == "application_stats_error_total":
-                        self._process_error_total(result_merge[metric], item, period)
-                    if metric == "application_stats_seconds_count":
-                        self._process_seconds_count(result_merge[metric], item, period)
-                    if metric == "application_stats_seconds":
-                        self._process_execution_time(result_merge[metric], item, period)
-                    grouped[period][metric] = item
-
-                for period, metric_group in grouped.items():
-                    if (
-                        "application_stats_error_total" in metric_group
-                        and "application_stats_seconds_count" in metric_group
-                    ):
-                        self._process_devide_error_by_requests(
-                            merged_dataset_err=result_merge[
-                                "application_stats_error_total"
-                            ],
-                            merged_dataset_req=result_merge[
-                                "application_stats_seconds_count"
-                            ],
-                            values_by_timeperiods_err=metric_group[
-                                "application_stats_error_total"
-                            ],
-                            values_by_timeperiods_req=metric_group[
-                                "application_stats_seconds_count"
-                            ],
-                            period=period,
-                        )
+                merge_result = self._process_task(task=task)
 
                 self._report_queue.put((task.task_id, False))
 
@@ -449,67 +463,15 @@ class Worker(multiprocessing.Process):
                         f"end processing cluster: {self._cluster_in_progress}"
                     )
 
-                    self.debug_time()
-
-                    result_val_by_period = self._perform_values_by_timedelta(
-                        merged_data=result_merge, task=task
-                    )
-
-                    grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = (
-                        defaultdict(dict)
-                    )
-                    for key, item in result_val_by_period.items():
-                        metric, period = key
-                        if metric == "application_stats_error_total":
-                            self._process_error_total(
-                                result_merge[metric], item, period
-                            )
-                        if metric == "application_stats_seconds_count":
-                            self._process_seconds_count(
-                                result_merge[metric], item, period
-                            )
-                        if metric == "application_stats_seconds":
-                            self._process_execution_time(
-                                result_merge[metric], item, period
-                            )
-                        grouped[period][metric] = item
-
-                    for period, metric_group in grouped.items():
-                        if (
-                            "application_stats_error_total" in metric_group
-                            and "application_stats_seconds_count" in metric_group
-                        ):
-                            self._process_devide_error_by_requests(
-                                merged_dataset_err=result_merge[
-                                    "application_stats_error_total"
-                                ],
-                                merged_dataset_req=result_merge[
-                                    "application_stats_seconds_count"
-                                ],
-                                values_by_timeperiods_err=metric_group[
-                                    "application_stats_error_total"
-                                ],
-                                values_by_timeperiods_req=metric_group[
-                                    "application_stats_seconds_count"
-                                ],
-                                period=period,
-                            )
+                    _ = self._process_task(task=task, previous_merge=merge_result)
 
                     self._previous_datasets = {}
                     self._previous_times = {}
                     self._report_queue.put((task.task_id, True))
 
-                    for metric, item in self._resulted_datasets.items():
-                        for period, item2 in item.items():
-                            for aggregate, item3 in item2.items():
-                                self.logger.info(
-                                    f"END: {metric} -> {period} -> {aggregate}: shape: {item3.shape}"
-                                )
-                                file_path = f"datasets/{self._cluster_in_progress}_{metric}_{period.total_seconds()}_{aggregate}.csv"
-                                item3.to_csv(file_path)
-                                self.logger.info(f"Saved: {file_path}")
-
+                    self._save_cluster()
                     # сбрасываем информацию о кластере
+
                     self._cluster_in_progress = None
                     self._resulted_datasets = {}
 
