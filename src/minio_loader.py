@@ -187,6 +187,14 @@ class LoadClusterTask:
 
             self.logger.info("Task finished")
         except Exception:
+            fail_msg = LoadComplete(
+                cluster_name=self.cluster_name,
+                loaded_datetime=self._end_time,
+                metrics={},
+                is_end=True,
+                task_id=self._task_id,
+            )
+            self._processor_queue.put(fail_msg)
             self.logger.info("Interrupt task")
         finally:
             # освобождаем очередь
