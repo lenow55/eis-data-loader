@@ -100,14 +100,12 @@ if __name__ == "__main__":
     total_task = progress.add_task(
         "Total", total=len(CLUSTERS), visible=True, start=True
     )
-    stopEvent = multiprocessing.Event()
 
     workers: list[Worker] = []
     for i, queue in enumerate(queues):
         worker = Worker(
             worker_id=i,
             queue_in=queue,
-            stop_event=stopEvent,
             report_queue=report_queue,
             timedeltas=timedeltas,
             aggregations=aggregations,
@@ -135,21 +133,19 @@ if __name__ == "__main__":
                 progress.advance(msg[0], len(times2load))
                 progress.advance(total_task, 1)
             if progress.finished:
-                stopEvent.set()
                 break
-            progress.refresh()
-        for worker in workers:
-            worker.join()
+
         executor.shutdown()
     except KeyboardInterrupt:
         logger.error("program killed")
-        stopEvent.set()
+        executor.shutdown(cancel_futures=True)
+    finally:
         for worker in workers:
+            worker.terminate()
             worker.join(timeout=30)
             if worker.is_alive():
                 worker.kill()
             else:
                 worker.close()
-        executor.shutdown(cancel_futures=True)
 
     logger.info("Close app")
