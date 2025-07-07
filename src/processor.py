@@ -108,39 +108,6 @@ class Worker(multiprocessing.Process):
             f"Dimesion:\n{self._resulted_datasets[metric][period][aggregation].shape}"
         )
 
-    def _process_seconds_count(
-        self,
-        merged_dataset: pd.DataFrame,
-        values_by_timeperiods: pd.DataFrame,
-        period: timedelta,
-    ):
-        dropnan = lambda a: a[~np.isnan(a)]
-        change_by_timeperiod = values_by_timeperiods.map(dropnan)
-        change_by_timeperiod = change_by_timeperiod.map(np.diff)
-        change_by_timeperiod = change_by_timeperiod.map(np.clip, a_min=0, a_max=None)
-        change_by_timeperiod = change_by_timeperiod.map(np.sum)
-
-        for aggregation in self._aggregations:
-            keys = [merged_dataset[col] for col in aggregation]
-
-            groups = change_by_timeperiod.groupby(keys)
-            sum_df = groups.sum().T
-            sum_df = sum_df.add_suffix("_sum")
-            max_df = groups.max().T
-            max_df = max_df.add_suffix("_max")
-            mean_df = groups.mean().T
-            mean_df = mean_df.add_suffix("_mean")
-            std_df = groups.std().T
-            std_df = std_df.add_suffix("_std")
-
-            aggregate_df = sum_df.join([max_df, mean_df, std_df])
-            self._update_df(
-                "application_stats_seconds_count",
-                period,
-                "-".join(aggregation),
-                aggregate_df,
-            )
-
     def _process_devide_error_by_requests(
         self,
         merged_dataset_err: pd.DataFrame,
