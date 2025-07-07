@@ -61,7 +61,7 @@ class Worker(multiprocessing.Process):
         )
         self._stop_event: EventMP = stop_event
         self._previous_datasets: dict[str, pd.DataFrame] = {}
-        self._previous_time: datetime | None = None
+        self._previous_times: dict[str, datetime] = {}
 
         self._timedeltas: list[timedelta] = timedeltas
         self._aggregations: list[list[str]] = aggregations
@@ -288,28 +288,46 @@ class Worker(multiprocessing.Process):
 
         return result_preprocessing
 
-    def _perform_merge(self, preprocessed_data: dict[str, pd.DataFrame], is_end: bool):
+    def _perform_merge(
+        self, preprocessed_data: dict[str, pd.DataFrame], task: LoadComplete
+    ):
         result: dict[str, pd.DataFrame] = {}
         for metric_name, metric_data in preprocessed_data.items():
             self.logger.info(f"Try merge {metric_name}")
             if metric_data.empty:
-                # если данные пустые, то пропускаем обработку
-                # пока не окажемся на конце кластера
-                # в конце кластера вставляем предыдущий датасет просто, если есть
-                prev_dataset = self._previous_datasets.get(metric_name)
-                if isinstance(prev_dataset, pd.DataFrame):
-                    result.update({metric_name: prev_dataset})
-
+                # если данные пришли пустые
                 self.logger.info(f"Metric data empty {metric_name}")
+                # пытаемся получить датасет с предыдущего захода
+                prev_dataset = self._previous_datasets.get(metric_name)
+                prev_time = self._previous_times.get(metric_name)
+                if isinstance(prev_dataset, pd.DataFrame):
+                    # если предыдущий есть, то посчитаем по нему
+                    result.update({metric_name: prev_dataset})
+                    # при чём предыдущий уберём из памяти
+                    del self._previous_datasets[metric_name]
+                else:
+                    # если предыдущего нет
+                    if isinstance(prev_time, datetime):
+                        # уже начали обработку этой метрики, вернём пустой фрейм
+                        result.update({metric_name: pd.DataFrame([])})
+                    else:
+                        # пока не начали обработку метрики ничего не возвращаем
+                        pass
+
                 continue
+
             if metric_name not in self._previous_datasets:
                 # если нет предыдущего датасета, то текущий записываем в него
-                # и идём дальше
+                # и пропускаем мёрдж
                 self._previous_datasets[metric_name] = metric_data
-                self.logger.info(f"previous_dataset {metric_name} inited")
+                self.logger.info(f"previous_dataset {metric_name} setted")
+
+                # здесь же устанавливаем время так как тут можем отловить ситуацию
+                # с первым не нулевым датасетом в метрике
+                self._previous_times[metric_name] = task.loaded_datetime
                 continue
 
-            # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
+            # предыдущий датасет есть и новые данные не пустые
             previous_dataset = self._previous_datasets[metric_name]
 
             result.update(
@@ -330,7 +348,7 @@ class Worker(multiprocessing.Process):
         result: dict[tuple[str, timedelta], pd.DataFrame] = {}
 
         for metric_name, metric_data in merged_data.items():
-            if not isinstance(self._previous_time, datetime):
+            if not isinstance(self._previous_times, datetime):
                 continue
             for period in self._timedeltas:
                 self.logger.info(
@@ -340,7 +358,7 @@ class Worker(multiprocessing.Process):
                 # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
                 res_df = values_by_timeperiods_func(
                     merged_dataset=metric_data,
-                    start_time=self._previous_time,
+                    start_time=self._previous_times,
                     period=period,
                 )
                 self.logger.info(
@@ -350,6 +368,12 @@ class Worker(multiprocessing.Process):
                 result.update({(metric_name, period): res_df})
 
         return result
+
+    def debug_time(self):
+        for metric, metric_time in self._previous_times.items():
+            self.logger.debug(
+                f"start processing {metric} time: {metric_time.isoformat()}"
+            )
 
     @override
     def run(self):
@@ -377,12 +401,7 @@ class Worker(multiprocessing.Process):
                     merged_data=result_merge
                 )
 
-                if self._previous_time:
-                    self.logger.debug(
-                        f"start processing time: {self._previous_time.isoformat()}"
-                    )
-                else:
-                    self.logger.info("Sckiped first record")
+                self.debug_time()
 
                 grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = defaultdict(
                     dict
@@ -418,22 +437,20 @@ class Worker(multiprocessing.Process):
                             period=period,
                         )
 
-                if self._previous_time:
+                if self._previous_times:
                     self._report_queue.put((task.task_id, False))
 
                 # устанавливаем предыдущее время на текущую запись
-                self._previous_time = task.loaded_datetime
+                self._previous_times = task.loaded_datetime
 
                 if task.is_end:
                     # INFO: был передан последний файл. Его надо отдельно обработать
                     self.logger.info(
                         f"end processing cluster: {self._cluster_in_progress}"
                     )
-                    self._previous_time = task.loaded_datetime
+                    self._previous_times = task.loaded_datetime
 
-                    self.logger.debug(
-                        f"processing time: {self._previous_time.isoformat()}"
-                    )
+                    self.debug_time()
 
                     result_val_by_period = self._perform_values_by_timedelta(
                         merged_data=result_merge
@@ -479,7 +496,7 @@ class Worker(multiprocessing.Process):
                             )
 
                     self._previous_datasets = {}
-                    self._previous_time = None
+                    self._previous_times = {}
                     self._report_queue.put((task.task_id, True))
 
                     for metric, item in self._resulted_datasets.items():
