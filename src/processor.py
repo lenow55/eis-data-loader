@@ -70,8 +70,6 @@ class Worker(multiprocessing.Process):
         ] = {}
         # INFO: метрика > временной промежуток > агрегация
 
-        self.nested_executor: ProcessPoolExecutor
-
     def _update_df(
         self,
         metric: str,
@@ -384,7 +382,6 @@ class Worker(multiprocessing.Process):
 
     @override
     def run(self):
-        self.nested_executor = ProcessPoolExecutor(max_workers=3)
         while True:
             try:
                 task = self.queue_in.get(block=True, timeout=10)
@@ -530,7 +527,6 @@ class Worker(multiprocessing.Process):
                     self.logger.warning("processor was interrupted")
                     break
 
-        self.nested_executor.shutdown()
         self.logger.warning("processor end")
 
     def _log_datasets2mlflow(self):
