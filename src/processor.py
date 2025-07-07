@@ -2,7 +2,7 @@ import logging
 import multiprocessing
 import traceback
 from collections import defaultdict
-from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 from multiprocessing import Queue
 from multiprocessing.synchronize import Event as EventMP
@@ -17,7 +17,6 @@ from src.schemas import LoadComplete
 from src.utils.aggregate import (
     COLS_KEYS_MAPPING,
     merge_current_with_prev,
-    mode_fft_via_hist,
     safe_median,
     values_by_timeperiods_func,
 )
@@ -250,7 +249,7 @@ class Worker(multiprocessing.Process):
             aggregate_df = q50_df.join([q75_df, q90_df, q95_df, q99_df])
             aggregate_df.columns = aggregate_df.columns.droplevel(0)
             self._update_df(
-                f"application_stats_seconds",
+                "application_stats_seconds",
                 period,
                 "-".join(aggregation),
                 aggregate_df,
@@ -269,38 +268,22 @@ class Worker(multiprocessing.Process):
 
         self._compute_quantile(merged_dataset, change_by_timeperiod_median, period)
 
-    def _preprocess_data(self, task: LoadComplete):
-        filename_err = task.metrics["application_stats_error_total"]
-        filename_count = task.metrics["application_stats_seconds_count"]
-        filename_seconds = task.metrics["application_stats_seconds"]
-
-        preprocess_futures: dict[str, Future[pd.DataFrame]] = {}
-        preprocess_futures.update(
-            {
-                "application_stats_error_total": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_err
-                )
-            }
-        )
-        preprocess_futures.update(
-            {
-                "application_stats_seconds_count": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_count
-                )
-            }
-        )
-        preprocess_futures.update(
-            {
-                "application_stats_seconds": self.nested_executor.submit(
-                    preprocess_metric_df, file_path=filename_seconds
-                )
-            }
-        )
+    def _preprocess_data(self, task: LoadComplete) -> dict[str, pd.DataFrame]:
         result_preprocessing: dict[str, pd.DataFrame] = {}
 
-        for metric, future in preprocess_futures.items():
-            preproces_res_df = future.result()
-            result_preprocessing.update({metric: preproces_res_df})
+        for metric in [
+            "application_stats_error_total",
+            "application_stats_seconds_count",
+            "application_stats_seconds",
+        ]:
+            file_name = task.metrics.get(metric)
+            if not isinstance(file_name, str):
+                self.logger.warning(f"metric: {metric} not loaded")
+                continue
+
+            result_preprocessing.update(
+                {metric: preprocess_metric_df(file_path=file_name)}
+            )
             self.logger.info(f"Preprocessed {metric}")
 
         return result_preprocessing
