@@ -441,7 +441,18 @@ class Worker(multiprocessing.Process):
         while True:
             try:
                 task = self.queue_in.get(block=True, timeout=10)
+            except Empty:
+                self.logger.warning("No tasks consumed")
+                continue
+            except Exception as e:
+                self.logger.critical(traceback.format_exc())
+                raise e
+            finally:
+                if self._stop_event.is_set():
+                    self.logger.warning("processor was interrupted")
+                    break
 
+            try:
                 if not isinstance(self._cluster_in_progress, str):
                     self._cluster_in_progress = task.cluster_name
                     self.logger.info(
@@ -451,7 +462,9 @@ class Worker(multiprocessing.Process):
                     self.logger.extra.update(
                         {"cluster": str(self._cluster_in_progress)}
                     )
-                self.logger.info(f"Accept task datetime: {task.loaded_datetime}")
+                self.logger.info(
+                    f"Accept task datetime: {task.loaded_datetime}; is END: {task.is_end}"
+                )
 
                 merge_result = self._process_task(task=task)
 
@@ -484,12 +497,27 @@ class Worker(multiprocessing.Process):
                 self.logger.warning("No tasks consumed")
             except Exception:
                 self.logger.critical(traceback.format_exc())
+                if task.is_end:
+                    self._previous_datasets = {}
+                    self._previous_times = {}
+                    self._report_queue.put((task.task_id, True))
+
+                    self._save_cluster()
+                    # сбрасываем информацию о кластере
+
+                    self._cluster_in_progress = None
+                    self._resulted_datasets = {}
+
+                if isinstance(self.logger.extra, dict):
+                    self.logger.extra.update(
+                        {"cluster": str(self._cluster_in_progress)}
+                    )
             finally:
                 if self._stop_event.is_set():
                     self.logger.warning("processor was interrupted")
                     break
 
-        self.logger.warning("processor end")
+        self.logger.info("processor end")
 
     def _log_datasets2mlflow(self):
         pass
