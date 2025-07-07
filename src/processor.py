@@ -83,7 +83,7 @@ class Worker(multiprocessing.Process):
             if period in self._resulted_datasets[metric]:
                 if aggregation in self._resulted_datasets[metric][period]:
                     curr_df = self._resulted_datasets[metric][period][aggregation]
-                    new_df = pd.concat([curr_df, aggregate_df])
+                    new_df = pd.concat([curr_df, aggregate_df], copy=False)
                     self._resulted_datasets[metric][period][aggregation] = (
                         new_df.sort_index()
                     )
