@@ -344,28 +344,35 @@ class Worker(multiprocessing.Process):
 
         return result
 
-    def _perform_values_by_timedelta(self, merged_data: dict[str, pd.DataFrame]):
+    def _perform_values_by_timedelta(
+        self, merged_data: dict[str, pd.DataFrame], task: LoadComplete
+    ):
         result: dict[tuple[str, timedelta], pd.DataFrame] = {}
 
         for metric_name, metric_data in merged_data.items():
-            if not isinstance(self._previous_times, datetime):
-                continue
-            for period in self._timedeltas:
-                self.logger.info(
-                    f"Try compute values_by_timeperiods: {metric_name}; timedelta: {period}"
-                )
+            # если _previous_times для метрики не установлен, то и в мёрджах этой метрики
+            # не будет совсем
+            prev_time = self._previous_times.get(metric_name)
+            if isinstance(prev_time, datetime):
+                # поэтому если merged_data присутствует в результатах,
+                # а _previous_time нет, то надо этот цикл пропустить и обновить _previous_time
+                for period in self._timedeltas:
+                    self.logger.info(
+                        f"Try compute values_by_timeperiods: {metric_name}; timedelta: {period}"
+                    )
 
-                # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
-                res_df = values_by_timeperiods_func(
-                    merged_dataset=metric_data,
-                    start_time=self._previous_times,
-                    period=period,
-                )
-                self.logger.info(
-                    f"Computed values_by_timeperiods {metric_name}; timedelta: {period}"
-                )
+                    # считаем что сейчас предыдущий точно есть, так как установлен _previous_time
+                    res_df = values_by_timeperiods_func(
+                        merged_dataset=metric_data,
+                        start_time=prev_time,
+                        period=period,
+                    )
+                    self.logger.info(
+                        f"Computed values_by_timeperiods {metric_name}; timedelta: {period}"
+                    )
 
-                result.update({(metric_name, period): res_df})
+                    result.update({(metric_name, period): res_df})
+            self._previous_times[metric_name] = task.loaded_datetime
 
         return result
 
@@ -395,10 +402,10 @@ class Worker(multiprocessing.Process):
 
                 result_preprocessing = self._preprocess_data(task)
 
-                result_merge = self._perform_merge(result_preprocessing, task.is_end)
+                result_merge = self._perform_merge(result_preprocessing, task)
 
                 result_val_by_period = self._perform_values_by_timedelta(
-                    merged_data=result_merge
+                    merged_data=result_merge, task=task
                 )
 
                 self.debug_time()
@@ -437,24 +444,20 @@ class Worker(multiprocessing.Process):
                             period=period,
                         )
 
-                if self._previous_times:
-                    self._report_queue.put((task.task_id, False))
-
-                # устанавливаем предыдущее время на текущую запись
-                self._previous_times = task.loaded_datetime
+                self._report_queue.put((task.task_id, False))
 
                 if task.is_end:
                     # INFO: был передан последний файл. Его надо отдельно обработать
                     self.logger.info(
                         f"end processing cluster: {self._cluster_in_progress}"
                     )
-                    self._previous_times = task.loaded_datetime
 
                     self.debug_time()
 
                     result_val_by_period = self._perform_values_by_timedelta(
-                        merged_data=result_merge
+                        merged_data=result_merge, task=task
                     )
+
                     grouped: defaultdict[timedelta, dict[str, pd.DataFrame]] = (
                         defaultdict(dict)
                     )
