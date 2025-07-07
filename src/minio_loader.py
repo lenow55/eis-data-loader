@@ -200,6 +200,7 @@ class LoadClusterTask:
             # освобождаем очередь
             self.logger.info("Queue released")
             self._q_manager.release_queue(lock)
+            self._pool_executor.shutdown(cancel_futures=True)
 
     def _get_files_with_sizes(self, prefix: str):
         if not prefix.endswith("/"):
