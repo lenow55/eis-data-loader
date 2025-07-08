@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
 from logging import config as log_config_m
 from multiprocessing import Queue
@@ -112,8 +112,10 @@ if __name__ == "__main__":
         worker.start()
 
     executor = ThreadPoolExecutor(max_workers=count_workers)
+    futures: list[Future[None]] = []
     for task in tasks:
         future = executor.submit(task)
+        futures.append(future)
 
     pid = os.getpid()
 
@@ -137,8 +139,12 @@ if __name__ == "__main__":
         executor.shutdown()
     except KeyboardInterrupt:
         logger.error("program killed")
-        executor.shutdown(cancel_futures=True)
+        for future in futures:
+            _ = future.cancel()
+
+        executor.shutdown()
     finally:
+        progress.stop()
         logger.info("shutdown app")
         for worker in workers:
             worker.terminate()
