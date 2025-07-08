@@ -485,6 +485,9 @@ class Worker(multiprocessing.Process):
 
             except Empty:
                 self.logger.warning("No tasks consumed")
+            except KeyboardInterrupt:
+                self.logger.warning("processor was interrupted")
+                break
             except Exception as e:
                 if task.is_end:
                     self.logger.info("Handle error at end cluster: Save results")

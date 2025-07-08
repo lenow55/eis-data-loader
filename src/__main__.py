@@ -139,7 +139,7 @@ if __name__ == "__main__":
         logger.error("program killed")
         executor.shutdown(cancel_futures=True)
     finally:
-        logger.error("shutdown app")
+        logger.info("shutdown app")
         for worker in workers:
             worker.terminate()
             worker.join(timeout=30)
