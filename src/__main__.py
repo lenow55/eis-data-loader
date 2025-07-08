@@ -140,12 +140,12 @@ if __name__ == "__main__":
         logger.error("program killed")
         executor.shutdown(cancel_futures=True)
     finally:
+        logger.error("shutdown app")
         for worker in workers:
             worker.terminate()
             worker.join(timeout=30)
             if worker.is_alive():
                 worker.kill()
-            else:
-                worker.close()
+            worker.close()
 
     logger.info("Close app")
