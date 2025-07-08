@@ -1,10 +1,13 @@
 import logging
 import os
+import queue
 import tempfile
+from threading import Event
 import traceback
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from multiprocessing import Queue
+from queue import Queue as TQueue
 
 import pandas as pd
 from botocore.exceptions import ClientError
@@ -38,6 +41,8 @@ class LoadClusterTask:
         bucket_name: str,
         cluster_name: str,
         q_manager: QueueManager,
+        report_queue: "Queue[tuple[TaskID, bool]]",
+        stop_event: Event,
         start_time: datetime,
         end_time: datetime,
         metrics_list: list[str],
@@ -63,6 +68,8 @@ class LoadClusterTask:
 
         self._q_manager: QueueManager = q_manager
         self._processor_queue: "Queue[LoadComplete]"
+        self._stop_event: Event = stop_event
+        self._report_queue: "Queue[tuple[TaskID, bool]]" = report_queue
 
     def __call__(self):
         """ "
@@ -180,27 +187,31 @@ class LoadClusterTask:
 
                 # пытаемся положить и ждём пока очередь разблокируется
                 start = datetime.now().timestamp()
-                self._processor_queue.put(msg, block=True)
+                while True:
+                    try:
+                        self._processor_queue.put(msg, block=True, timeout=5)
+                    except queue.Full:
+                        pass
+                    finally:
+                        if self._stop_event.is_set():
+                            self.logger.info("Interrupt task")
+                            raise Exception
+                        break
+
                 end = datetime.now().timestamp()
                 wait_time = end - start
                 self.logger.debug(f"Wait queue: {wait_time:.2f} seconds")
 
             self.logger.info("Task finished")
         except Exception:
-            fail_msg = LoadComplete(
-                cluster_name=self.cluster_name,
-                loaded_datetime=self._end_time,
-                metrics={},
-                is_end=True,
-                task_id=self._task_id,
-            )
-            self._processor_queue.put(fail_msg)
-            self.logger.info("Interrupt task")
+            fail_msg = (self._task_id, True)
+            self._report_queue.put(fail_msg)
+            self.logger.info("Interrupt task by exception")
         finally:
             # освобождаем очередь
             self.logger.info("Queue released")
             self._q_manager.release_queue(lock)
-            self._pool_executor.shutdown(cancel_futures=True)
+            self._pool_executor.shutdown(wait=False)
 
     def _get_files_with_sizes(self, prefix: str):
         if not prefix.endswith("/"):

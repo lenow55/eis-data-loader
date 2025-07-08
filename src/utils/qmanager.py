@@ -19,3 +19,7 @@ class QueueManager:
 
     def release_queue(self, lock: Lock) -> None:
         lock.release()
+
+    def shutdown(self):
+        for queue in self.queues:
+            queue.close()

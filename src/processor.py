@@ -437,17 +437,6 @@ class Worker(multiprocessing.Process):
         while True:
             try:
                 task = self.queue_in.get(block=True, timeout=10)
-            except Empty:
-                self.logger.warning("No tasks consumed")
-                continue
-            except KeyboardInterrupt:
-                self.logger.warning("processor was interrupted")
-                break
-            except Exception as e:
-                self.logger.critical(traceback.format_exc())
-                raise e
-
-            try:
                 if not isinstance(self._cluster_in_progress, str):
                     self._cluster_in_progress = task.cluster_name
                     self.logger.info(
@@ -487,25 +476,21 @@ class Worker(multiprocessing.Process):
                 self.logger.warning("No tasks consumed")
             except KeyboardInterrupt:
                 self.logger.warning("processor was interrupted")
-                break
-            except Exception as e:
-                if task.is_end:
-                    self.logger.info("Handle error at end cluster: Save results")
+                if isinstance(self._cluster_in_progress, str):
+                    self.logger.info("Save results")
                     self._previous_datasets = {}
                     self._previous_times = {}
-                    self._report_queue.put((task.task_id, True))
 
                     self._save_cluster()
                     # сбрасываем информацию о кластере
 
                     self._cluster_in_progress = None
                     self._resulted_datasets = {}
+                break
 
-                if isinstance(e, KeyboardInterrupt):
-                    self.logger.warning("processor was interrupted")
-                    break
-                else:
-                    self.logger.critical(traceback.format_exc())
+            except Exception:
+                self.logger.critical(traceback.format_exc())
+
             finally:
                 if isinstance(self.logger.extra, dict):
                     self.logger.extra.update(

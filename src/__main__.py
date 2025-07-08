@@ -5,6 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
 from logging import config as log_config_m
 from multiprocessing import Queue
+from threading import Event
 
 import pandas as pd
 from boto3.session import Session
@@ -57,6 +58,7 @@ if __name__ == "__main__":
         Queue(maxsize=q_size) for _ in range(count_workers)
     ]
     q_manager = QueueManager(queues)
+    load_stop_event = Event()
 
     report_queue: "Queue[tuple[TaskID, bool]]" = Queue()
 
@@ -84,6 +86,8 @@ if __name__ == "__main__":
             bucket_name="metrics",
             cluster_name=cluster,
             q_manager=q_manager,
+            report_queue=report_queue,
+            stop_event=load_stop_event,
             start_time=start_time,
             end_time=times2load[-1],
             times2load=times2load,
@@ -138,14 +142,15 @@ if __name__ == "__main__":
 
         executor.shutdown()
     except KeyboardInterrupt:
-        logger.error("program killed")
-        for future in futures:
-            _ = future.cancel()
-
-        executor.shutdown()
+        logger.error("program shutdown")
+        load_stop_event.set()
+        executor.shutdown(wait=True, cancel_futures=True)
     finally:
-        progress.stop()
         logger.info("shutdown app")
+        progress.stop()
+        report_queue.close()
+        q_manager.shutdown()
+        client.close()
         for worker in workers:
             worker.terminate()
             worker.join(timeout=30)
