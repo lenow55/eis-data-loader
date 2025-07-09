@@ -83,6 +83,7 @@ def values_by_timeperiods_func(
     # Оставим только валидные
     orig = df.dropna(subset=["bin"]).copy()
     orig["bin"] = orig["bin"].astype(int)
+    orig["values"] = orig["values"].astype(float)
 
     if take_next:
         # 5a) Для каждой (row_id, bin) найдём первую точку
@@ -108,7 +109,7 @@ def values_by_timeperiods_func(
     # 6) Снова группируем в списки и разворачиваем в wide
     grouped = (
         combined.groupby(["row_id", "bin"], sort=False)["values"]
-        .agg(lambda x: np.array(list(x)))
+        .apply(lambda x: np.array(list(x)))
         .unstack(fill_value=np.array([]))  # pyright: ignore[reportArgumentType]
     )
 
