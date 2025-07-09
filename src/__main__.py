@@ -1,5 +1,6 @@
 import json
 import logging
+import multiprocessing
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -103,12 +104,14 @@ if __name__ == "__main__":
     total_task = progress.add_task(
         "Total", total=len(CLUSTERS), visible=True, start=True
     )
+    stopEvent = multiprocessing.Event()
 
     workers: list[Worker] = []
     for i, queue in enumerate(queues):
         worker = Worker(
             worker_id=i,
             queue_in=queue,
+            stop_event=stopEvent,
             report_queue=report_queue,
             timedeltas=timedeltas,
             aggregations=aggregations,
@@ -138,8 +141,11 @@ if __name__ == "__main__":
                 progress.advance(msg[0], len(times2load))
                 progress.advance(total_task, 1)
             if progress.finished:
+                stopEvent.set()
                 break
-
+            progress.refresh()
+        for worker in workers:
+            worker.join()
         executor.shutdown()
     except KeyboardInterrupt:
         logger.error("program shutdown")
@@ -151,11 +157,12 @@ if __name__ == "__main__":
         report_queue.close()
         q_manager.shutdown()
         client.close()
+        stopEvent.set()
         for worker in workers:
-            worker.terminate()
             worker.join(timeout=30)
             if worker.is_alive():
-                worker.kill()
+                worker.terminate()
             worker.close()
+        executor.shutdown(cancel_futures=True)
 
     logger.info("Close app")

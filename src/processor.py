@@ -2,8 +2,10 @@ import logging
 import multiprocessing
 import traceback
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 from multiprocessing import Queue
+from multiprocessing.synchronize import Event as EventMP
 from queue import Empty
 
 import numpy as np
@@ -27,6 +29,7 @@ class Worker(multiprocessing.Process):
         self,
         worker_id: int,
         queue_in: "Queue[LoadComplete]",
+        stop_event: EventMP,
         report_queue: "Queue[tuple[TaskID, bool]]",
         timedeltas: list[timedelta],
         aggregations: list[list[str]],
@@ -56,6 +59,7 @@ class Worker(multiprocessing.Process):
                 "cluster": str(self._cluster_in_progress),
             },
         )
+        self._stop_event: EventMP = stop_event
         self._previous_datasets: dict[str, pd.DataFrame] = {}
         self._previous_times: dict[str, datetime] = {}
 
@@ -496,6 +500,9 @@ class Worker(multiprocessing.Process):
                     self.logger.extra.update(
                         {"cluster": str(self._cluster_in_progress)}
                     )
+                if self._stop_event.is_set():
+                    self.logger.warning("processor was interrupted")
+                    break
 
         self.logger.info("processor end")
 
