@@ -438,6 +438,7 @@ class Worker(multiprocessing.Process):
 
     @override
     def run(self):
+        self.logger.info("Start worker")
         while True:
             try:
                 task = self.queue_in.get(block=True, timeout=10)
@@ -493,7 +494,7 @@ class Worker(multiprocessing.Process):
                 break
 
             except Exception:
-                self.logger.critical(traceback.format_exc())
+                self.logger.error(f"{traceback.format_exc()}")
 
             finally:
                 if isinstance(self.logger.extra, dict):
