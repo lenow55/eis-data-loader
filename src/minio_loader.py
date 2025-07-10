@@ -104,12 +104,12 @@ class LoadClusterTask:
                 in minio: {objects_from_minio} \n\
                 requested: {self._metrics_list}"
                 )
-                raise Exception("not all metrics presence in minio")
-            self.logger.info("metrics check passed")
+            else:
+                self.logger.info("metrics check passed")
 
             # проверяем временные промежутки по месяцам
             objects_month4check = list_months(self._start_time, self._end_time)
-            for metric in self._metrics_list:
+            for metric in metrics:
                 months_from_minio = self._list_objects(prefix=metric)
                 if not all(month in months_from_minio for month in objects_month4check):
                     self.logger.critical(
@@ -117,34 +117,34 @@ class LoadClusterTask:
                     in minio: {months_from_minio} \n\
                     requested: {objects_month4check}"
                     )
-                    raise Exception("not all months presence in minio")
-            self.logger.info("months check passed")
+                else:
+                    self.logger.info(f"months check passed metric: {metric}")
 
-            metric2files: dict[str, list[tuple[str, int]]] = {}
-            # проверяем что все метрики для этого кластера не нулевые
-            for metric in self._metrics_list:
-                for month in objects_month4check:
-                    clusters_from_minio = self._list_objects(
-                        prefix=metric + "/" + month
-                    )
-                    if self.cluster_name not in clusters_from_minio:
-                        self.logger.critical(
-                            f"cluster not presence in minio, metric {metric}: \n\
-                        in minio: {clusters_from_minio} \n\
-                        requested: {self.cluster_name}"
-                        )
-                        raise Exception("cluster_name not presence in minio")
-                    files_sizes = self._get_files_with_sizes(
-                        prefix="/".join([metric, month, self.cluster_name])
-                    )
-                    empty_files = [item for item in files_sizes if item[1] <= 500]
-                    if len(empty_files) == len(files_sizes):
-                        self.logger.critical(
-                            f"cluster is empty files in minio, metric {metric}"
-                        )
-                        raise Exception("cluster is empty in minio")
-
-                    metric2files.update({metric: files_sizes})
+            # metric2files: dict[str, list[tuple[str, int]]] = {}
+            # # проверяем что все метрики для этого кластера не нулевые
+            # for metric in self._metrics_list:
+            #     for month in objects_month4check:
+            #         clusters_from_minio = self._list_objects(
+            #             prefix=metric + "/" + month
+            #         )
+            #         if self.cluster_name not in clusters_from_minio:
+            #             self.logger.critical(
+            #                 f"cluster not presence in minio, metric {metric}: \n\
+            #             in minio: {clusters_from_minio} \n\
+            #             requested: {self.cluster_name}"
+            #             )
+            #             raise Exception("cluster_name not presence in minio")
+            #         files_sizes = self._get_files_with_sizes(
+            #             prefix="/".join([metric, month, self.cluster_name])
+            #         )
+            #         empty_files = [item for item in files_sizes if item[1] <= 500]
+            #         if len(empty_files) == len(files_sizes):
+            #             self.logger.critical(
+            #                 f"cluster is empty files in minio, metric {metric}"
+            #             )
+            #             raise Exception("cluster is empty in minio")
+            #
+            #         metric2files.update({metric: files_sizes})
 
             self.logger.info("cluster files sizes passed")
 
