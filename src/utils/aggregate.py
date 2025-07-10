@@ -81,7 +81,7 @@ def values_by_timeperiods_func(
     df["bin"] = pd.cut(df["timestamps"], bins=edges, right=False, labels=False)  # pyright: ignore[reportArgumentType, reportCallIssue]
 
     # Оставим только валидные
-    orig = df.dropna(subset=["bin"]).copy()
+    orig = df.dropna(subset=["bin"]).copy(deep=False)
     orig["bin"] = orig["bin"].astype(int)
     orig["values"] = orig["values"].astype(float)
 
@@ -102,6 +102,7 @@ def values_by_timeperiods_func(
         combined = pd.concat(
             [orig[["row_id", "bin", "values"]], extra[["row_id", "bin", "values"]]],
             ignore_index=True,
+            copy=False,
         )
     else:
         combined = orig[["row_id", "bin", "values"]]
