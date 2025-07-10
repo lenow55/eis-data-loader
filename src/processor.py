@@ -493,7 +493,7 @@ class Worker(multiprocessing.Process):
                 break
 
             except Exception:
-                self.logger.error(f"{traceback.format_exc()}")
+                self.logger.critical(f"{traceback.format_exc()}")
 
             finally:
                 if isinstance(self.logger.extra, dict):
