@@ -494,6 +494,22 @@ class Worker(multiprocessing.Process):
 
             except Exception:
                 self.logger.critical(f"{traceback.format_exc()}")
+                task_tmp = locals().get("task")
+                if not isinstance(task_tmp, LoadComplete):
+                    continue
+
+                if task_tmp.is_end:
+                    self.logger.warning(
+                        "End task with critical exception: Save Results"
+                    )
+                    self._previous_datasets = {}
+                    self._previous_times = {}
+
+                    self._save_cluster()
+                    # сбрасываем информацию о кластере
+
+                    self._cluster_in_progress = None
+                    self._resulted_datasets = {}
 
             finally:
                 if isinstance(self.logger.extra, dict):
