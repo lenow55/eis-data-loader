@@ -296,20 +296,11 @@ class Worker(multiprocessing.Process):
                 self.logger.info(f"Metric data empty {metric_name}")
                 # пытаемся получить датасет с предыдущего захода
                 prev_dataset = self._previous_datasets.get(metric_name)
-                prev_time = self._previous_times.get(metric_name)
                 if isinstance(prev_dataset, pd.DataFrame):
                     # если предыдущий есть, то посчитаем по нему
                     result.update({metric_name: prev_dataset})
                     # при чём предыдущий уберём из памяти
                     del self._previous_datasets[metric_name]
-                else:
-                    # если предыдущего нет
-                    if isinstance(prev_time, datetime):
-                        # уже начали обработку этой метрики, вернём пустой фрейм
-                        result.update({metric_name: pd.DataFrame([])})
-                    else:
-                        # пока не начали обработку метрики ничего не возвращаем
-                        pass
 
                 continue
 
