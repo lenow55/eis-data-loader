@@ -2,38 +2,52 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 from scipy.signal import fftconvolve
 
 COLS_KEYS_MAPPING = {
     "application_stats_error_total": [
-        "pod_uid",
+        "namespace",
+        "env",
+        "cluster",
+        "instance",
+        "pod",
         "context",
         "group",
+        "k8s_cluster",
         "operation",
-        # "app",
         "pod_node_name",
-        "cluster",
+        "pod_uid",
+        "srv",
         "reason",
     ],
     "application_stats_seconds_count": [
-        "pod_uid",
+        "namespace",
+        "env",
+        "cluster",
+        "instance",
+        "pod",
         "context",
         "group",
+        "k8s_cluster",
         "operation",
-        # "app",
         "pod_node_name",
-        "cluster",
+        "pod_uid",
+        "srv",
     ],
     "application_stats_seconds": [
-        "pod_uid",
+        "namespace",
+        "env",
+        "cluster",
+        "instance",
+        "pod",
         "context",
         "group",
+        "k8s_cluster",
         "operation",
-        # "app",
         "pod_node_name",
+        "pod_uid",
+        "srv",
         "quantile",
-        "cluster",
     ],
 }
 

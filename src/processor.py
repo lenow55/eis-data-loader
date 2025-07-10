@@ -2,7 +2,6 @@ import logging
 import multiprocessing
 import traceback
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 from multiprocessing import Queue
 from multiprocessing.synchronize import Event as EventMP
