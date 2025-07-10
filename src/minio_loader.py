@@ -41,7 +41,7 @@ class LoadClusterTask:
         bucket_name: str,
         cluster_name: str,
         q_manager: QueueManager,
-        report_queue: "Queue[tuple[TaskID, bool]]",
+        report_queue: "TQueue[tuple[TaskID, bool]]",
         stop_event: Event,
         start_time: datetime,
         end_time: datetime,
@@ -69,7 +69,7 @@ class LoadClusterTask:
         self._q_manager: QueueManager = q_manager
         self._processor_queue: "Queue[LoadComplete]"
         self._stop_event: Event = stop_event
-        self._report_queue: "Queue[tuple[TaskID, bool]]" = report_queue
+        self._report_queue: "TQueue[tuple[TaskID, bool]]" = report_queue
 
     def __call__(self):
         """ "
