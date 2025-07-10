@@ -189,6 +189,8 @@ def safe_median(arr: np.ndarray):
     # Пустой массив
     if arr.size == 0:
         return np.nan
+    if np.isnan(arr).all():  # Если все элементы NaN
+        return np.nan
     res = np.nanmedian(arr)
     return res
 
