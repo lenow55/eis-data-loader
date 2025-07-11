@@ -376,7 +376,7 @@ class Worker(multiprocessing.Process):
 
                 self._report_queue.put(
                     AggregateComplete(
-                        task_id=task.task_id, is_end=task.is_end, is_empty=False
+                        task_id=task.task_id, is_end=False, is_empty=False
                     )
                 )
 
@@ -394,7 +394,7 @@ class Worker(multiprocessing.Process):
                     self._report_queue.put(
                         AggregateComplete(
                             task_id=task.task_id,
-                            is_end=task.is_end,
+                            is_end=True,
                             is_empty=is_empty,
                         )
                     )

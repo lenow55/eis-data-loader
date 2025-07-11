@@ -68,7 +68,7 @@ if __name__ == "__main__":
         *Progress.get_default_columns(),
         TimeElapsedColumn(),
         MofNCompleteColumn(),
-        TextColumn("[bold red]{task.fields[check]}", justify="right"),
+        TextColumn("{task.fields[check]}", justify="right"),
     )
     progress.start()
 
@@ -81,7 +81,11 @@ if __name__ == "__main__":
 
     for i, cluster in enumerate(CLUSTERS):
         task_id = progress.add_task(
-            cluster, total=len(times2load), visible=False, start=False
+            description=cluster,
+            total=len(times2load),
+            visible=False,
+            start=False,
+            check="",
         )
         task = LoadClusterTask(
             minio_client=client,
@@ -103,7 +107,7 @@ if __name__ == "__main__":
         tasks.append(task)
 
     total_task = progress.add_task(
-        "Total", total=len(CLUSTERS), visible=True, start=True
+        description="Total", total=len(CLUSTERS), visible=True, start=True, check=""
     )
     stopEvent = multiprocessing.Event()
 
