@@ -13,7 +13,7 @@ from botocore.exceptions import ClientError
 from mypy_boto3_s3.client import S3Client
 from rich.progress import TaskID
 
-from src.schemas import LoadComplete
+from src.schemas import AggregateComplete, LoadComplete
 from src.utils.qmanager import QueueManager
 
 logger = logging.getLogger("LoadClusterTask")
@@ -40,7 +40,7 @@ class LoadClusterTask:
         bucket_name: str,
         cluster_name: str,
         q_manager: QueueManager,
-        report_queue: "Queue[tuple[TaskID, bool]]",
+        report_queue: "Queue[AggregateComplete]",
         stop_event: Event,
         start_time: datetime,
         end_time: datetime,
@@ -68,7 +68,7 @@ class LoadClusterTask:
         self._q_manager: QueueManager = q_manager
         self._processor_queue: "Queue[LoadComplete]"
         self._stop_event: Event = stop_event
-        self._report_queue: "Queue[tuple[TaskID, bool]]" = report_queue
+        self._report_queue: "Queue[AggregateComplete]" = report_queue
 
     def __call__(self):
         """ "
@@ -203,7 +203,9 @@ class LoadClusterTask:
 
             self.logger.info("Task finished")
         except Exception:
-            fail_msg = (self._task_id, True)
+            fail_msg = AggregateComplete(
+                task_id=self._task_id, is_end=True, is_empty=True
+            )
             self._report_queue.put(fail_msg)
             self.logger.info("Interrupt task by exception")
         finally:

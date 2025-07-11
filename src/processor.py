@@ -1,7 +1,6 @@
 import logging
 import multiprocessing
 import traceback
-from collections import defaultdict
 from datetime import datetime, timedelta
 from multiprocessing import Queue
 from multiprocessing.synchronize import Event as EventMP
@@ -9,10 +8,9 @@ from queue import Empty
 
 import numpy as np
 import pandas as pd
-from rich.progress import TaskID
 from typing_extensions import override
 
-from src.schemas import LoadComplete
+from src.schemas import AggregateComplete, LoadComplete
 from src.utils.aggregate import (
     COLS_KEYS_MAPPING,
     merge_current_with_prev,
@@ -29,13 +27,13 @@ class Worker(multiprocessing.Process):
         worker_id: int,
         queue_in: "Queue[LoadComplete]",
         stop_event: EventMP,
-        report_queue: "Queue[tuple[TaskID, bool]]",
+        report_queue: "Queue[AggregateComplete]",
         timedeltas: list[timedelta],
         aggregations: list[list[str]],
     ):
         super().__init__(daemon=False)
         self.queue_in: "Queue[LoadComplete]" = queue_in
-        self._report_queue: Queue[tuple[TaskID, bool]] = report_queue
+        self._report_queue: Queue[AggregateComplete] = report_queue
         self.worker_id: int = worker_id
 
         self._base_logger: logging.Logger = logging.getLogger(
@@ -376,7 +374,11 @@ class Worker(multiprocessing.Process):
 
                 merge_result = self._process_task(task=task)
 
-                self._report_queue.put((task.task_id, False))
+                self._report_queue.put(
+                    AggregateComplete(
+                        task_id=task.task_id, is_end=task.is_end, is_empty=False
+                    )
+                )
 
                 if task.is_end:
                     # INFO: был передан последний файл. Его надо отдельно обработать
@@ -388,7 +390,14 @@ class Worker(multiprocessing.Process):
 
                     self._previous_datasets = {}
                     self._previous_times = {}
-                    self._report_queue.put((task.task_id, True))
+                    is_empty = not bool(self._resulted_datasets)
+                    self._report_queue.put(
+                        AggregateComplete(
+                            task_id=task.task_id,
+                            is_end=task.is_end,
+                            is_empty=is_empty,
+                        )
+                    )
 
                     self._save_cluster()
                     # сбрасываем информацию о кластере

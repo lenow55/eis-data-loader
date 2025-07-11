@@ -12,12 +12,12 @@ import pandas as pd
 from boto3.session import Session
 from botocore.config import Config
 from mypy_boto3_s3.client import S3Client
-from rich.progress import MofNCompleteColumn, Progress, TaskID, TimeElapsedColumn
+from rich.progress import MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
 
 from src.config import ExternalMinioSettings
 from src.minio_loader import LoadClusterTask
 from src.processor import Worker
-from src.schemas import LoadComplete
+from src.schemas import AggregateComplete, LoadComplete
 from src.utils.clusters import CLUSTERS
 from src.utils.qmanager import QueueManager
 
@@ -61,13 +61,14 @@ if __name__ == "__main__":
     q_manager = QueueManager(queues)
     load_stop_event = Event()
 
-    report_queue: "Queue[tuple[TaskID, bool]]" = Queue()
+    report_queue: "Queue[AggregateComplete]" = Queue()
 
     tasks: list[LoadClusterTask] = []
     progress = Progress(
         *Progress.get_default_columns(),
         TimeElapsedColumn(),
         MofNCompleteColumn(),
+        TextColumn("{task.description}", justify="right"),
     )
     progress.start()
 
@@ -131,14 +132,23 @@ if __name__ == "__main__":
     try:
         while True:
             msg = report_queue.get()
-            if not progress.tasks[msg[0]].started:
-                progress.start_task(msg[0])
-                progress.tasks[msg[0]].visible = True
-            progress.advance(msg[0])
+            if not progress.tasks[msg.task_id].started:
+                progress.start_task(msg.task_id)
+                progress.tasks[msg.task_id].visible = True
+            progress.advance(msg.task_id)
 
-            if msg[1]:
-                progress.stop_task(msg[0])
-                progress.advance(msg[0], len(times2load))
+            if msg.is_end:
+                progress.stop_task(msg.task_id)
+
+                remaining = progress.tasks[msg.task_id].remaining
+                if isinstance(remaining, float):
+                    progress.advance(msg.task_id, remaining)
+
+                if msg.is_empty:
+                    progress.update(msg.task_id, description="empty")
+                else:
+                    progress.update(msg.task_id, description="ok")
+
                 progress.advance(total_task, 1)
             if progress.finished:
                 stopEvent.set()

@@ -11,3 +11,10 @@ class LoadComplete:
     metrics: dict[str, str | None]
     is_end: bool
     task_id: TaskID
+
+
+@dataclass
+class AggregateComplete:
+    task_id: TaskID
+    is_end: bool
+    is_empty: bool
