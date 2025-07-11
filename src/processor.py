@@ -182,14 +182,25 @@ class Worker(multiprocessing.Process):
             keys.append(merged_dataset["quantile"])
 
             groups = change_by_timeperiod.groupby(keys)
-            q50_df = groups.quantile(q=0.5).T.add_suffix("_q50")
-            q75_df = groups.quantile(q=0.75).T.add_suffix("_q75")
-            q90_df = groups.quantile(q=0.90).T.add_suffix("_q90")
-            q95_df = groups.quantile(q=0.95).T.add_suffix("_q95")
-            q99_df = groups.quantile(q=0.99).T.add_suffix("_q99")
+            q50_df = groups.quantile(q=0.5).T
+            q75_df = groups.quantile(q=0.75).T
+            q90_df = groups.quantile(q=0.90).T
+            q95_df = groups.quantile(q=0.95).T
+            q99_df = groups.quantile(q=0.99).T
+
+            q50_df.columns = ["_".join(map(str, col)) for col in q50_df.columns.values]
+            q75_df.columns = ["_".join(map(str, col)) for col in q75_df.columns.values]
+            q90_df.columns = ["_".join(map(str, col)) for col in q90_df.columns.values]
+            q95_df.columns = ["_".join(map(str, col)) for col in q95_df.columns.values]
+            q99_df.columns = ["_".join(map(str, col)) for col in q99_df.columns.values]
+
+            q50_df = q50_df.add_suffix("_q50")
+            q75_df = q75_df.add_suffix("_q75")
+            q90_df = q90_df.add_suffix("_q90")
+            q95_df = q95_df.add_suffix("_q95")
+            q99_df = q99_df.add_suffix("_q99")
 
             aggregate_df = q50_df.join([q75_df, q90_df, q95_df, q99_df])
-            aggregate_df.columns = aggregate_df.columns.droplevel(0)
             self._update_df(
                 "application_stats_seconds",
                 period,
