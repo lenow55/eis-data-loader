@@ -68,7 +68,7 @@ if __name__ == "__main__":
         *Progress.get_default_columns(),
         TimeElapsedColumn(),
         MofNCompleteColumn(),
-        TextColumn("{task.description}", justify="right"),
+        TextColumn("[bold red]{task.fields[check]}", justify="right"),
     )
     progress.start()
 
@@ -145,9 +145,9 @@ if __name__ == "__main__":
                     progress.advance(msg.task_id, remaining)
 
                 if msg.is_empty:
-                    progress.update(msg.task_id, description="empty")
+                    progress.update(msg.task_id, check="empty")
                 else:
-                    progress.update(msg.task_id, description="ok")
+                    progress.update(msg.task_id, check="ok")
 
                 progress.advance(total_task, 1)
             if progress.finished:
